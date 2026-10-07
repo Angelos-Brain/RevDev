@@ -17,7 +17,7 @@
           <small>Study smarter from your files.</small>
         </span>
       </a>
-      <span class="status-pill">Milestone 2 · AI study modes</span>
+      <span class="status-pill">Milestone 3 · Full study modes</span>
     </div>
   </header>
 
@@ -78,11 +78,11 @@
         <span class="section-kicker">NOW AVAILABLE</span>
         <h2>Study modes</h2>
         <div class="mode-list">
-          <div class="mode-item">
+          <div class="mode-item active">
             <span class="mode-number">01</span>
             <div>
               <strong>Mock Exam</strong>
-              <p>Coming in Milestone 3 with scoring, explanations, and weakest-topic feedback.</p>
+              <p>20-question exam with scoring, explanations, and weakest-topic feedback.</p>
             </div>
           </div>
           <div class="mode-item active">
@@ -113,40 +113,39 @@
       </div>
 
       <div class="settings-grid">
-        <div class="field">
-          <label for="provider-select">AI provider</label>
+        <label class="field">
+          <span class="field-label">AI provider</span>
           <select id="provider-select">
             <option value="gemini">Google Gemini (default)</option>
             <option value="groq">Groq</option>
           </select>
-        </div>
+        </label>
 
-        <div class="field">
-          <label for="api-key">API key</label>
-          <div class="input-with-action">
+        <label class="field api-key-field">
+          <span class="field-label">API key</span>
+          <div class="api-key-row">
             <input id="api-key" type="password" placeholder="Paste your free API key" autocomplete="off" spellcheck="false">
-            <button class="text-button" id="toggle-key" type="button">Show</button>
+            <button class="button secondary small-button" id="toggle-key" type="button">Show</button>
           </div>
-        </div>
+        </label>
       </div>
 
-      <div class="provider-help">
-        <div id="gemini-help">
-          <strong>Gemini</strong>
-          <p>Get a free Gemini API key in Google AI Studio. RevDev uses <code>gemini-3.8-flash</code>.</p>
-          <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Open Google AI Studio</a>
-        </div>
-        <div id="groq-help" hidden>
-          <strong>Groq</strong>
-          <p>Get a Groq API key from the Groq console. RevDev uses <code>openai/gpt-oss-120b</code>.</p>
-          <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Open Groq Console</a>
-        </div>
+      <div id="gemini-help" class="provider-help">
+        <strong>Gemini</strong>
+        <p>Get a free Gemini API key in Google AI Studio. RevDev uses <code>gemini-3.8-flash</code>.</p>
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Open Google AI Studio</a>
       </div>
 
-      <div class="privacy-mini">
-        <span aria-hidden="true">●</span>
-        <span>The key is saved only in this browser's localStorage. It is sent only to the provider you select.</span>
+      <div id="groq-help" class="provider-help" hidden>
+        <strong>Groq</strong>
+        <p>Get a free Groq API key. RevDev uses <code>openai/gpt-oss-120b</code> with structured JSON output.</p>
+        <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Open Groq Console</a>
       </div>
+
+      <p class="storage-note">
+        <span class="dot"></span>
+        The key is saved only in this browser's localStorage. It is sent only to the provider you select.
+      </p>
     </section>
 
     <section class="card generate-card">
@@ -155,59 +154,76 @@
           <span class="section-kicker">3 · GENERATE</span>
           <h2>Choose how you want to study</h2>
         </div>
-        <span id="generation-meta" class="mini-note">Read at least one file first</span>
+        <span class="mini-note" id="generation-meta">Read at least one file first</span>
       </div>
 
       <div class="generator-grid">
-        <div class="field">
-          <label for="mode-select">Study mode</label>
+        <label class="field">
+          <span class="field-label">Study mode</span>
           <select id="mode-select">
             <option value="exam">Mock Exam</option>
             <option value="flashcards">Flashcards</option>
             <option value="summary">Summary Reviewer</option>
           </select>
-        </div>
+        </label>
 
-        <div class="field">
-          <label for="topic-select">Topic</label>
+        <label class="field">
+          <span class="field-label">Topic focus</span>
           <select id="topic-select">
             <option value="all">All extracted topics</option>
+            <option value="custom">Custom topic…</option>
           </select>
-        </div>
+        </label>
 
-        <div class="field custom-topic-field" id="custom-topic-wrap" hidden>
-          <label for="custom-topic">Custom topic focus</label>
-          <input id="custom-topic" type="text" maxlength="120" placeholder="e.g. recursion, OSI model, SQL joins">
-        </div>
+        <label class="field custom-topic-field" id="custom-topic-wrap" hidden>
+          <span class="field-label">Custom topic</span>
+          <input id="custom-topic" type="text" placeholder="e.g. Binary Search time complexity" autocomplete="off">
+        </label>
       </div>
 
-      <div class="topic-hint">
-        RevDev detects likely headings from your extracted files and adds them to the topic selector. Choose “Custom topic”
-        when you want the AI to focus on a specific subject.
+      <div class="action-row">
+        <button class="button primary" id="generate-button" type="button" disabled>Generate study material</button>
       </div>
 
-      <button class="button primary generate-button" id="generate-button" type="button" disabled>Generate study material</button>
       <div id="generation-status" class="status-message" role="status" aria-live="polite"></div>
-      <div id="progress" class="progress-bar" hidden><span id="progress-fill"></span></div>
+      <div id="progress" class="progress" hidden>
+        <div class="progress-track">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card preview-card">
+      <div class="card-heading">
+        <div>
+          <span class="section-kicker">EXTRACTED TEXT</span>
+          <h2>Preview</h2>
+        </div>
+        <span class="mini-note" id="preview-meta">Nothing extracted yet</span>
+      </div>
+      <div id="preview" class="preview empty-preview">Upload files and click “Read files” to see the extracted text.</div>
     </section>
 
     <section class="card output-card" id="flashcards-output" hidden>
       <div class="card-heading">
         <div>
           <span class="section-kicker">FLASHCARDS</span>
-          <h2>Your cards</h2>
+          <h2>Study cards</h2>
         </div>
-        <div class="output-actions"><span id="flashcard-count" class="mini-note">0 cards</span><button class="button secondary small-button" id="export-csv" type="button">Export CSV</button></div>
+        <div class="output-actions">
+          <span id="flashcard-count" class="mini-note">0 cards</span>
+          <button class="button secondary small-button" id="export-csv" type="button">Export CSV</button>
+        </div>
       </div>
 
       <div class="flashcard-shell">
         <button class="flashcard" id="flashcard" type="button" aria-label="Flip flashcard">
           <span class="flashcard-face flashcard-front">
-            <span class="card-label">FRONT</span>
+            <span class="face-label">Front</span>
             <span id="flashcard-front">No cards generated yet.</span>
           </span>
           <span class="flashcard-face flashcard-back">
-            <span class="card-label">BACK</span>
+            <span class="face-label">Back</span>
             <span id="flashcard-back">—</span>
           </span>
         </button>
@@ -220,108 +236,71 @@
       </div>
 
       <div class="rating-row">
-        <span>How did you do?</span>
-        <button class="button review-button" id="review-again" type="button">Review again</button>
-        <button class="button known-button" id="know-card" type="button">I know it</button>
+        <button class="button secondary" id="review-again" type="button">Review again</button>
+        <button class="button primary" id="know-card" type="button">I know it</button>
         <button class="button secondary" id="shuffle-cards" type="button">Shuffle</button>
       </div>
 
       <div class="card-stats" id="flashcard-stats"></div>
     </section>
 
-    <section class="card output-card exam-output" id="exam-output" hidden>
-      <div class="card-heading">
-        <div>
-          <span class="section-kicker">MOCK EXAM</span>
-          <h2>20-item practice exam</h2>
-        </div>
-        <div class="output-actions">
-          <span id="exam-count" class="mini-note">20 questions</span>
-          <button class="button secondary small-button" id="print-exam" type="button">Print</button>
-        </div>
-      </div>
-
-      <div id="exam-intro" class="exam-intro">
-        Answer all questions, then submit to see your score, correct answers, explanations, and weakest topics.
-      </div>
-
-      <form id="exam-form" class="exam-form"></form>
-
-      <div class="exam-actions">
-        <button class="button primary" id="submit-exam" type="button" disabled>Submit exam</button>
-        <button class="button secondary" id="retake-exam" type="button" hidden>Retake</button>
-      </div>
-
-      <div id="exam-results" class="exam-results" hidden>
-        <div class="score-panel">
-          <div>
-            <span class="score-label">SCORE</span>
-            <strong id="exam-score">0 / 20</strong>
-          </div>
-          <div>
-            <span class="score-label">PERCENT</span>
-            <strong id="exam-percent">0%</strong>
-          </div>
-        </div>
-
-        <div class="weak-topic-panel">
-          <h3>Weakest topics</h3>
-          <div id="weak-topics"></div>
-        </div>
-
-        <div>
-          <h3 class="results-heading">Answer review</h3>
-          <div id="answer-review" class="answer-review"></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="card output-card summary-output" id="summary-output" hidden>
+    <section class="card output-card" id="summary-output" hidden>
       <div class="card-heading">
         <div>
           <span class="section-kicker">SUMMARY REVIEWER</span>
-          <h2>Topic-by-topic reviewer</h2>
+          <h2>Topic review</h2>
         </div>
-        <div class="output-actions"><span id="summary-topic-count" class="mini-note">0 topics</span><button class="button secondary small-button" id="print-summary" type="button">Print to PDF</button></div>
+        <div class="output-actions">
+          <span id="summary-topic-count" class="mini-note">0 topics</span>
+          <button class="button secondary small-button" id="print-summary" type="button">Print to PDF</button>
+        </div>
       </div>
       <div id="summary-content"></div>
     </section>
 
-    <section class="card preview-card">
+    <section class="card output-card" id="exam-output" hidden>
       <div class="card-heading">
         <div>
-          <span class="section-kicker">SOURCE TEXT</span>
-          <h2>Text preview</h2>
+          <span class="section-kicker">MOCK EXAM</span>
+          <h2>Practice test</h2>
         </div>
-        <span id="preview-meta" class="mini-note">Nothing extracted yet</span>
+        <div class="output-actions">
+          <span id="exam-count" class="mini-note">0 questions</span>
+          <button class="button secondary small-button" id="print-exam" type="button">Print</button>
+        </div>
       </div>
-      <div id="preview" class="preview empty-preview">
-        Upload files and click “Read files” to see the extracted text.
-      </div>
-    </section>
 
-    <section class="help-card">
-      <div>
-        <span class="section-kicker">SUPPORTED FILES</span>
-        <h2>What RevDev can read</h2>
+      <div id="exam-intro" class="exam-intro"></div>
+      <form id="exam-form" class="exam-form"></form>
+
+      <div class="exam-actions">
+        <button class="button primary" id="submit-exam" type="button">Submit answers</button>
+        <button class="button secondary" id="retake-exam" type="button" hidden>Retake</button>
       </div>
-      <div class="support-grid">
-        <div><strong>PDF</strong><span>Selectable text PDFs work. Scanned/image-only PDFs are flagged as unreadable text.</span></div>
-        <div><strong>DOCX</strong><span>Paragraph and document text are extracted in the browser.</span></div>
-        <div><strong>PPTX</strong><span>Text inside PowerPoint slides is extracted from the presentation package.</span></div>
-        <div><strong>TXT / MD</strong><span>Plain text and Markdown are read directly.</span></div>
+
+      <div id="exam-results" class="exam-results" hidden>
+        <div class="score-row">
+          <div>
+            <span class="score-label">Score</span>
+            <strong id="exam-score">0 / 0</strong>
+          </div>
+          <div>
+            <span class="score-label">Percentage</span>
+            <strong id="exam-percent">0%</strong>
+          </div>
+        </div>
+        <div id="weak-topics" class="weak-topics"></div>
+        <div id="answer-review" class="answer-review"></div>
       </div>
     </section>
   </main>
 
   <footer class="site-footer">
-    <div class="shell">
-      <p>RevDev runs as a static GitHub Pages site. AI requests go directly from your browser to your selected provider.</p>
+    <div class="shell footer-inner">
+      <p>RevDev runs entirely in your browser. No account, no backend, no paid service required.</p>
     </div>
   </footer>
 
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.2/dist/jszip.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.13.0/mammoth.browser.min.js"></script>
-  <script type="module" src="app.js"></script>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>
