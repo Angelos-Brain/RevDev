@@ -517,3 +517,361 @@ button { cursor: pointer; }
 
   .button { width: 100%; }
 }
+
+
+.mode-item.active {
+  background: #f8faff;
+  margin: -6px -8px;
+  padding: 8px;
+  border-radius: 12px;
+  border-bottom-color: transparent;
+}
+
+.settings-grid,
+.generator-grid {
+  display: grid;
+  grid-template-columns: 0.7fr 1.3fr;
+  gap: 14px;
+}
+
+.generator-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-bottom: 7px;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fff;
+  color: var(--text);
+  padding: 0 12px;
+  outline: none;
+}
+
+.field input:focus,
+.field select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(49, 94, 251, 0.1);
+}
+
+.input-with-action {
+  position: relative;
+}
+
+.input-with-action input {
+  padding-right: 62px;
+}
+
+.text-button {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-weight: 800;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 5px 4px;
+}
+
+.provider-help {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 13px 14px;
+  background: #fbfcff;
+}
+
+.provider-help strong {
+  font-size: 0.85rem;
+}
+
+.provider-help p {
+  margin: 2px 0 5px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.provider-help a {
+  color: var(--primary);
+  font-size: 0.79rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.provider-help a:hover { text-decoration: underline; }
+
+.provider-help code {
+  font-size: 0.76rem;
+  background: #eef1f6;
+  padding: 2px 5px;
+  border-radius: 5px;
+}
+
+.privacy-mini {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  margin-top: 11px;
+}
+
+.privacy-mini span:first-child {
+  color: var(--success);
+  font-size: 0.7rem;
+}
+
+.generator-grid {
+  align-items: end;
+}
+
+.custom-topic-field {
+  grid-column: 1 / -1;
+}
+
+.topic-hint {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.generate-button {
+  margin-top: 17px;
+}
+
+.progress-bar {
+  height: 5px;
+  overflow: hidden;
+  background: #e8ecf4;
+  border-radius: 99px;
+  margin-top: 8px;
+}
+
+.progress-bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--primary);
+  transition: width 0.2s ease;
+}
+
+.output-card {
+  margin-top: 22px;
+}
+
+.flashcard-shell {
+  perspective: 1200px;
+}
+
+.flashcard {
+  display: grid;
+  border: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 300px;
+  background: transparent;
+  text-align: left;
+  perspective: 1200px;
+}
+
+.flashcard-face {
+  grid-area: 1 / 1;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(150deg, #f8faff, #fff);
+  min-height: 300px;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  box-shadow: var(--shadow);
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+  transition: transform 0.35s ease;
+}
+
+.flashcard-front { transform: rotateY(0deg); }
+
+.flashcard-back {
+  transform: rotateY(180deg);
+  background: #111a2c;
+  color: #fff;
+}
+
+.flashcard.is-flipped .flashcard-front {
+  transform: rotateY(-180deg);
+}
+
+.flashcard.is-flipped .flashcard-back {
+  transform: rotateY(0deg);
+}
+
+.card-label {
+  color: var(--primary);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  font-size: 0.67rem;
+  margin-bottom: 16px;
+}
+
+.flashcard-back .card-label {
+  color: #b7c8ff;
+}
+
+#flashcard-front,
+#flashcard-back {
+  font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+  line-height: 1.35;
+  font-weight: 750;
+  max-width: 760px;
+  white-space: pre-wrap;
+}
+
+.flashcard-controls,
+.rating-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.card-position {
+  min-width: 72px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.rating-row {
+  justify-content: flex-start;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.review-button {
+  background: #fff1e6;
+  color: #9a5700;
+}
+
+.known-button {
+  background: #e8f7ef;
+  color: #167248;
+}
+
+.card-stats {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  min-height: 18px;
+}
+
+.summary-section {
+  border-top: 1px solid var(--line);
+  padding: 20px 0;
+}
+
+.summary-section:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.summary-section h3 {
+  margin: 0 0 14px;
+  font-size: 1.08rem;
+  letter-spacing: -0.02em;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+}
+
+.summary-box {
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 14px;
+  background: #fbfcfe;
+}
+
+.summary-box h4 {
+  margin: 0 0 8px;
+  font-size: 0.77rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.summary-box ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.summary-box li {
+  margin: 5px 0;
+  font-size: 0.84rem;
+}
+
+.self-check {
+  margin-top: 13px;
+  padding: 14px;
+  border-radius: 13px;
+  background: var(--soft);
+  border: 1px solid #d7e1ff;
+}
+
+.self-check h4 {
+  margin: 0 0 8px;
+  font-size: 0.77rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--primary);
+}
+
+.self-check ol {
+  margin: 0;
+  padding-left: 19px;
+}
+
+.self-check li {
+  margin: 5px 0;
+  font-size: 0.84rem;
+}
+
+[hidden] { display: none !important; }
+
+@media (max-width: 860px) {
+  .settings-grid,
+  .generator-grid { grid-template-columns: 1fr; }
+
+  .custom-topic-field { grid-column: auto; }
+
+  .summary-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .flashcard,
+  .flashcard-face { min-height: 255px; }
+
+  .rating-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rating-row .button { width: 100%; }
+}
