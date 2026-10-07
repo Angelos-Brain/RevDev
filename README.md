@@ -23,7 +23,7 @@ Milestones 2 and 3 will add Gemini/Groq AI generation, chunking, retry/backoff, 
 
 ## GitHub Pages setup
 
-GitHub Pages supports publishing from a branch and the `/docs` folder. urlGitHub Pages publishing-source documentationhttps://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site
+GitHub Pages supports publishing from a branch and the `/docs` folder.
 
 1. Open the RevDev repository on GitHub.
 2. Switch to the `build-revdev` branch.
@@ -35,7 +35,11 @@ GitHub Pages supports publishing from a branch and the `/docs` folder. url
 8. Click **Save**.
 9. Open the generated Pages URL shown by GitHub.
 
-For GitHub Free, the repository must be public for GitHub Pages. urlGitHub Pages guidehttps://docs.github.com/en/pages/getting-started-with-github-pages/creating-a-github-pages-site
+GitHub Pages documentation:
+https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site
+
+For GitHub Free, the repository must be public for GitHub Pages:
+https://docs.github.com/en/pages/getting-started-with-github-pages/creating-a-github-pages-site
 
 ## CDN libraries
 
@@ -45,7 +49,14 @@ The site uses exact pinned CDN versions:
 - Mammoth 1.13.0
 - JSZip 3.10.2
 
-These versions were checked against the package/documentation sources available on October 7, 2026. PDF.js documents CDN use for pdfjs-dist; the npm package currently lists 6.4.299. Mammoth currently lists 1.13.0. JSZip currently lists 3.10.2. urlPDF.js getting startedhttps://mozilla.github.io/pdf.js/getting_started/ urlpdfjs-dist on npmhttps://www.npmjs.com/package/pdfjs-dist urlMammoth on npmhttps://www.npmjs.com/package/mammoth urlJSZip documentationhttps://stuk.github.io/jszip/
+These versions were checked against the package/documentation sources available on October 7, 2026.
+
+Sources:
+
+- PDF.js: https://mozilla.github.io/pdf.js/getting_started/
+- pdfjs-dist: https://www.npmjs.com/package/pdfjs-dist
+- Mammoth: https://www.npmjs.com/package/mammoth
+- JSZip: https://stuk.github.io/jszip/
 
 ## Privacy
 
