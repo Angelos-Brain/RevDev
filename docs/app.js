@@ -11,7 +11,8 @@ const CONFIG = Object.freeze({
   supportedExtensions: ["pdf", "docx", "pptx", "txt", "md", "markdown"],
   apiKeyStorageKey: "revdev_ai_api_key",
   providerStorageKey: "revdev_ai_provider",
-  topicStorageKey: "revdev_topic_focus"
+  topicStorageKey: "revdev_topic_focus",
+  customTopicStorageKey: "revdev_custom_topic"
 });
 
 const AI_CONFIG = Object.freeze({
@@ -915,6 +916,10 @@ function saveProviderSettings() {
 
   if (elements.topicSelect.value === "custom") {
     localStorage.setItem(CONFIG.topicStorageKey, "custom");
+    localStorage.setItem(
+      CONFIG.customTopicStorageKey,
+      elements.customTopic.value.trim()
+    );
   }
 }
 
@@ -922,14 +927,18 @@ function loadProviderSettings() {
   const savedKey = localStorage.getItem(CONFIG.apiKeyStorageKey) || "";
   const savedProvider = localStorage.getItem(CONFIG.providerStorageKey) || "gemini";
   const savedTopic = localStorage.getItem(CONFIG.topicStorageKey) || "all";
+  const savedCustomTopic =
+    localStorage.getItem(CONFIG.customTopicStorageKey) || "";
 
   elements.apiKey.value = savedKey;
   elements.providerSelect.value = savedProvider === "groq" ? "groq" : "gemini";
+  elements.customTopic.value = savedCustomTopic;
 
   if (savedTopic) {
     elements.topicSelect.value = savedTopic;
   }
 
+  elements.customTopicWrap.hidden = savedTopic !== "custom";
   updateProviderHelp();
 }
 
@@ -1457,6 +1466,7 @@ function clearAll() {
   elements.topicSelect.value = "all";
 
   localStorage.removeItem(CONFIG.topicStorageKey);
+  localStorage.removeItem(CONFIG.customTopicStorageKey);
 
   resetGeneratedOutput();
   setStatus("");
@@ -1500,7 +1510,14 @@ elements.topicSelect.addEventListener("change", function () {
 });
 
 elements.customTopic.addEventListener("input", function () {
-  localStorage.setItem(CONFIG.topicStorageKey, elements.customTopic.value.trim());
+  localStorage.setItem(
+    CONFIG.customTopicStorageKey,
+    elements.customTopic.value.trim()
+  );
+
+  if (elements.topicSelect.value === "custom") {
+    localStorage.setItem(CONFIG.topicStorageKey, "custom");
+  }
 });
 
 elements.generateButton.addEventListener("click", generateMaterial);
