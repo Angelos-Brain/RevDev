@@ -1585,6 +1585,7 @@ function renderFlashcards(cards) {
   state.cardRatings.clear();
   state.cardIndex = 0;
   elements.summaryOutput.hidden = true;
+  elements.examOutput.hidden = true;
   elements.flashcardsOutput.hidden = false;
   updateFlashcardDisplay();
   elements.flashcardsOutput.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1592,6 +1593,7 @@ function renderFlashcards(cards) {
 
 function renderSummary(topics) {
   elements.flashcardsOutput.hidden = true;
+  elements.examOutput.hidden = true;
   elements.summaryOutput.hidden = false;
   elements.summaryTopicCount.textContent =
     topics.length + " " + (topics.length === 1 ? "topic" : "topics");
