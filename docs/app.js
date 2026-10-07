@@ -1,8 +1,13 @@
 // RevDev bootstrap
-// 1) Patch Gemini requests so responseSchema never includes unsupported "additionalProperties".
-// 2) Load the last known-good full application module from this repository.
+// 1) Use a higher free-tier Gemini model (Flash-Lite ~500 RPD vs Flash ~20 RPD).
+// 2) Strip unsupported "additionalProperties" from Gemini responseSchema.
+// 3) Rewrite rate-limit / quota errors into clear student-friendly messages.
+// 4) Load the last known-good full application module.
 (function () {
   const originalFetch = window.fetch.bind(window);
+
+  // Higher free-tier daily quota than gemini-3.8-flash on many projects.
+  const GEMINI_FREE_MODEL = "gemini-2.5-flash-lite";
 
   function stripAdditionalProperties(value) {
     if (Array.isArray(value)) {
@@ -19,28 +24,94 @@
     return cleaned;
   }
 
+  function isRateLimitBody(body) {
+    if (!body) return false;
+    const text = JSON.stringify(body).toLowerCase();
+    return (
+      text.includes("resource_exhausted") ||
+      text.includes("rate limit") ||
+      text.includes("quota") ||
+      text.includes("limit reached") ||
+      text.includes("too many requests")
+    );
+  }
+
+  function friendlyRateLimitMessage(provider) {
+    return (
+      "The " +
+      provider +
+      " free-tier limit was reached for this project. " +
+      "Wait a few minutes (or until midnight Pacific for daily quotas), " +
+      "try a smaller file, or switch provider to Groq and use a free Groq key."
+    );
+  }
+
   window.fetch = async function (url, options) {
-    if (
-      typeof url === "string" &&
-      url.includes("generativelanguage.googleapis.com") &&
-      options &&
-      typeof options.body === "string"
-    ) {
-      try {
-        const body = JSON.parse(options.body);
-        if (body.generationConfig && body.generationConfig.responseSchema) {
-          body.generationConfig.responseSchema = stripAdditionalProperties(
-            body.generationConfig.responseSchema
-          );
-          options = Object.assign({}, options, {
-            body: JSON.stringify(body)
-          });
+    var requestUrl = url;
+    var requestOptions = options;
+
+    if (typeof requestUrl === "string" && requestUrl.includes("generativelanguage.googleapis.com")) {
+      // Prefer Flash-Lite for free-tier headroom.
+      requestUrl = requestUrl.replace(/models\/[^:]+/, "models/" + encodeURIComponent(GEMINI_FREE_MODEL));
+
+      if (requestOptions && typeof requestOptions.body === "string") {
+        try {
+          var body = JSON.parse(requestOptions.body);
+          if (body.generationConfig && body.generationConfig.responseSchema) {
+            body.generationConfig.responseSchema = stripAdditionalProperties(
+              body.generationConfig.responseSchema
+            );
+            requestOptions = Object.assign({}, requestOptions, {
+              body: JSON.stringify(body)
+            });
+          }
+        } catch (error) {
+          // Keep the original request if parsing fails.
         }
-      } catch (error) {
-        // Keep the original request if parsing fails.
       }
     }
-    return originalFetch(url, options);
+
+    var response = await originalFetch(requestUrl, requestOptions);
+
+    // Clarify provider rate-limit / quota errors for students.
+    try {
+      if (!response.ok && (response.status === 429 || response.status === 403)) {
+        var cloned = response.clone();
+        var errorBody = null;
+        try {
+          errorBody = await cloned.json();
+        } catch (parseError) {
+          errorBody = null;
+        }
+
+        if (response.status === 429 || isRateLimitBody(errorBody)) {
+          var provider = requestUrl.includes("generativelanguage.googleapis.com")
+            ? "Gemini"
+            : requestUrl.includes("api.groq.com")
+              ? "Groq"
+              : "AI provider";
+
+          var message = friendlyRateLimitMessage(provider);
+          var payload = {
+            error: {
+              message: message,
+              status: "RESOURCE_EXHAUSTED",
+              code: 429
+            }
+          };
+
+          return new Response(JSON.stringify(payload), {
+            status: 429,
+            statusText: "Too Many Requests",
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+      }
+    } catch (rewriteError) {
+      // Fall through to the original response.
+    }
+
+    return response;
   };
 })();
 
