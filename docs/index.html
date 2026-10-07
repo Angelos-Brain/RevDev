@@ -17,7 +17,7 @@
           <small>Study smarter from your files.</small>
         </span>
       </a>
-      <span class="status-pill">Milestone 1 · File reader</span>
+      <span class="status-pill">Milestone 2 · AI study modes</span>
     </div>
   </header>
 
@@ -27,8 +27,8 @@
         <span class="eyebrow">FREE · BROWSER-FIRST</span>
         <h1>Turn your study files into a review workspace.</h1>
         <p class="hero-copy">
-          Upload one or more PDF, DOCX, PPTX, TXT, or Markdown files. RevDev reads readable text
-          directly in your browser and gives you a clean preview before any AI generation is used.
+          Upload your files, keep the source text in your browser, then use your own free Gemini or Groq key
+          to generate study material from that content.
         </p>
       </div>
     </section>
@@ -37,7 +37,7 @@
       <span class="privacy-icon" aria-hidden="true">✓</span>
       <div>
         <strong>Privacy by design</strong>
-        <p>Files are read in your browser. In the finished AI features, only extracted text is sent to the AI provider you choose.</p>
+        <p>Files are read in your browser. Only extracted text is sent to the AI provider you choose. Your API key is stored only in this browser.</p>
       </div>
     </section>
 
@@ -63,9 +63,7 @@
             <span>Selected files</span>
             <span id="file-count">0 files</span>
           </div>
-          <div id="file-list" class="file-list empty-state">
-            No files selected yet.
-          </div>
+          <div id="file-list" class="file-list empty-state">No files selected yet.</div>
         </div>
 
         <div class="action-row">
@@ -77,39 +75,175 @@
       </div>
 
       <aside class="card next-card">
-        <span class="section-kicker">COMING NEXT</span>
-        <h2>Pick how you want to study</h2>
+        <span class="section-kicker">NOW AVAILABLE</span>
+        <h2>Study modes</h2>
         <div class="mode-list">
           <div class="mode-item">
             <span class="mode-number">01</span>
             <div>
               <strong>Mock Exam</strong>
-              <p>Interactive questions, scoring, explanations, and weak-topic feedback.</p>
+              <p>Coming in Milestone 3 with scoring, explanations, and weakest-topic feedback.</p>
             </div>
           </div>
-          <div class="mode-item">
+          <div class="mode-item active">
             <span class="mode-number">02</span>
             <div>
               <strong>Flashcards</strong>
-              <p>Flip, shuffle, self-rate, and export cards for Anki.</p>
+              <p>Generate, flip, self-rate, and study cards from the uploaded text.</p>
             </div>
           </div>
-          <div class="mode-item">
+          <div class="mode-item active">
             <span class="mode-number">03</span>
             <div>
               <strong>Summary Reviewer</strong>
-              <p>Organized topic summaries with concepts, rules, mistakes, and self-checks.</p>
+              <p>Generate topic sections with concepts, definitions, rules, mistakes, and self-checks.</p>
             </div>
           </div>
         </div>
-        <p class="next-note">AI generation is added in Milestone 2. Nothing in this milestone needs an API key.</p>
       </aside>
+    </section>
+
+    <section class="card ai-card">
+      <div class="card-heading">
+        <div>
+          <span class="section-kicker">2 · CONNECT FREE AI</span>
+          <h2>Choose a provider</h2>
+        </div>
+        <span class="mini-note">No backend server</span>
+      </div>
+
+      <div class="settings-grid">
+        <div class="field">
+          <label for="provider-select">AI provider</label>
+          <select id="provider-select">
+            <option value="gemini">Google Gemini (default)</option>
+            <option value="groq">Groq</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="api-key">API key</label>
+          <div class="input-with-action">
+            <input id="api-key" type="password" placeholder="Paste your free API key" autocomplete="off" spellcheck="false">
+            <button class="text-button" id="toggle-key" type="button">Show</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="provider-help">
+        <div id="gemini-help">
+          <strong>Gemini</strong>
+          <p>Get a free Gemini API key in Google AI Studio. RevDev uses <code>gemini-3.8-flash</code>.</p>
+          <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Open Google AI Studio</a>
+        </div>
+        <div id="groq-help" hidden>
+          <strong>Groq</strong>
+          <p>Get a Groq API key from the Groq console. RevDev uses <code>openai/gpt-oss-120b</code>.</p>
+          <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Open Groq Console</a>
+        </div>
+      </div>
+
+      <div class="privacy-mini">
+        <span aria-hidden="true">●</span>
+        <span>The key is saved only in this browser's localStorage. It is sent only to the provider you select.</span>
+      </div>
+    </section>
+
+    <section class="card generate-card">
+      <div class="card-heading">
+        <div>
+          <span class="section-kicker">3 · GENERATE</span>
+          <h2>Choose how you want to study</h2>
+        </div>
+        <span id="generation-meta" class="mini-note">Read at least one file first</span>
+      </div>
+
+      <div class="generator-grid">
+        <div class="field">
+          <label for="mode-select">Study mode</label>
+          <select id="mode-select">
+            <option value="flashcards">Flashcards</option>
+            <option value="summary">Summary Reviewer</option>
+            <option value="exam" disabled>Mock Exam — Milestone 3</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="topic-select">Topic</label>
+          <select id="topic-select">
+            <option value="all">All extracted topics</option>
+          </select>
+        </div>
+
+        <div class="field custom-topic-field" id="custom-topic-wrap" hidden>
+          <label for="custom-topic">Custom topic focus</label>
+          <input id="custom-topic" type="text" maxlength="120" placeholder="e.g. recursion, OSI model, SQL joins">
+        </div>
+      </div>
+
+      <div class="topic-hint">
+        RevDev detects likely headings from your extracted files and adds them to the topic selector. Choose “Custom topic”
+        when you want the AI to focus on a specific subject.
+      </div>
+
+      <button class="button primary generate-button" id="generate-button" type="button" disabled>Generate study material</button>
+      <div id="generation-status" class="status-message" role="status" aria-live="polite"></div>
+      <div id="progress" class="progress-bar" hidden><span id="progress-fill"></span></div>
+    </section>
+
+    <section class="card output-card" id="flashcards-output" hidden>
+      <div class="card-heading">
+        <div>
+          <span class="section-kicker">FLASHCARDS</span>
+          <h2>Your cards</h2>
+        </div>
+        <span id="flashcard-count" class="mini-note">0 cards</span>
+      </div>
+
+      <div class="flashcard-shell">
+        <button class="flashcard" id="flashcard" type="button" aria-label="Flip flashcard">
+          <span class="flashcard-face flashcard-front">
+            <span class="card-label">FRONT</span>
+            <span id="flashcard-front">No cards generated yet.</span>
+          </span>
+          <span class="flashcard-face flashcard-back">
+            <span class="card-label">BACK</span>
+            <span id="flashcard-back">—</span>
+          </span>
+        </button>
+      </div>
+
+      <div class="flashcard-controls">
+        <button class="button secondary" id="previous-card" type="button">Previous</button>
+        <span id="flashcard-position" class="card-position">0 / 0</span>
+        <button class="button secondary" id="next-card" type="button">Next</button>
+      </div>
+
+      <div class="rating-row">
+        <span>How did you do?</span>
+        <button class="button review-button" id="review-again" type="button">Review again</button>
+        <button class="button known-button" id="know-card" type="button">I know it</button>
+        <button class="button secondary" id="shuffle-cards" type="button">Shuffle</button>
+      </div>
+
+      <div class="card-stats" id="flashcard-stats"></div>
+    </section>
+
+    <section class="card output-card summary-output" id="summary-output" hidden>
+      <div class="card-heading">
+        <div>
+          <span class="section-kicker">SUMMARY REVIEWER</span>
+          <h2>Topic-by-topic reviewer</h2>
+        </div>
+        <span id="summary-topic-count" class="mini-note">0 topics</span>
+      </div>
+      <div id="summary-content"></div>
     </section>
 
     <section class="card preview-card">
       <div class="card-heading">
         <div>
-          <span class="section-kicker">2 · REVIEW EXTRACTED TEXT</span>
+          <span class="section-kicker">SOURCE TEXT</span>
           <h2>Text preview</h2>
         </div>
         <span id="preview-meta" class="mini-note">Nothing extracted yet</span>
@@ -135,7 +269,7 @@
 
   <footer class="site-footer">
     <div class="shell">
-      <p>RevDev is designed to run as a static GitHub Pages site with no backend server.</p>
+      <p>RevDev runs as a static GitHub Pages site. AI requests go directly from your browser to your selected provider.</p>
     </div>
   </footer>
 
