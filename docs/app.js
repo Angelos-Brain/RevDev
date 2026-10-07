@@ -1,13 +1,14 @@
 // RevDev bootstrap
-// 1) Use a higher free-tier Gemini model (Flash-Lite ~500 RPD vs Flash ~20 RPD).
+// 1) Use Gemini Flash-Lite free-tier model currently available to new users.
 // 2) Strip unsupported "additionalProperties" from Gemini responseSchema.
 // 3) Rewrite rate-limit / quota errors into clear student-friendly messages.
 // 4) Load the last known-good full application module.
 (function () {
   const originalFetch = window.fetch.bind(window);
 
-  // Higher free-tier daily quota than gemini-3.8-flash on many projects.
-  const GEMINI_FREE_MODEL = "gemini-2.5-flash-lite";
+  // Google: gemini-2.5-flash-lite is no longer available to new users.
+  // Use gemini-3.5-flash-lite (recommended replacement with free-tier access).
+  const GEMINI_FREE_MODEL = "gemini-3.5-flash-lite";
 
   function stripAdditionalProperties(value) {
     if (Array.isArray(value)) {
