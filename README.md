@@ -4,7 +4,7 @@ RevDev is a free, browser-first study helper for college students. It turns uplo
 
 ## Current status
 
-Milestone 2 is complete on the `build-revdev` branch.
+Milestone 3 is complete on the `build-revdev` branch.
 
 It includes:
 
@@ -24,28 +24,31 @@ It includes:
 - JSON output schemas plus client-side validation before rendering
 - Duplicate removal while merging chunk results
 - Retry and exponential backoff for rate limits and temporary server errors
-- Interactive Flashcards
+- Interactive Flashcards with shuffle and self-rating
+- CSV export with `front,back` columns for Anki
 - Topic-based Summary Reviewer
+- Print-to-PDF for the Summary Reviewer
+- 20-item Mock Exam: 10 multiple choice, 5 true/false, 3 identification, 2 short-answer
+- Interactive exam answering, scoring, correct answers, explanations, and weakest-topic feedback
+- Printable Mock Exam and result review
 - No backend server and no build step
-
-Milestone 3 will add the interactive Mock Exam, scoring and weakest-topic feedback, CSV export for Anki, print-to-PDF, and the final GitHub Pages polish.
 
 ## AI models used
 
-The current default is Google Gemini `gemini-3.8-flash`. Google's current Gemini API pricing page lists a free tier for this model. The selectable Groq alternative is `openai/gpt-oss-120b`; Groq currently lists it on the Free Plan and documents Structured Outputs support.
+The current default is Google Gemini `gemini-3.8-flash`. Google's current Gemini API documentation uses this model in its structured-output examples. The selectable Groq alternative is `openai/gpt-oss-120b`, which Groq currently documents as supporting strict JSON Schema mode.
 
 Google:
-https://ai.google.dev/gemini-api/docs/pricing
-https://ai.google.dev/api/generate-content
+https://ai.google.dev/gemini-api/docs/get-started
+https://ai.google.dev/gemini-api/docs/structured-output
 https://aistudio.google.com/app/apikey
 
 Groq:
-https://console.groq.com/docs/rate-limits
-https://console.groq.com/docs/models
+https://console.groq.com/docs/model/openai/gpt-oss-120b
 https://console.groq.com/docs/structured-outputs
+https://console.groq.com/docs/rate-limits
 https://console.groq.com/keys
 
-These provider/model details were checked on October 7, 2026.
+These provider/model details were checked on October 7, 2026. Check the providers before long-term use because free-tier quotas and model availability can change.
 
 ## Generation rules
 
@@ -62,21 +65,22 @@ Long extracted text is split into browser-side chunks before generation. Chunk r
 
 ## GitHub Pages setup
 
-GitHub Pages supports publishing from a branch and the `/docs` folder.
+GitHub Pages can publish a branch using either its repository root or a `/docs` folder. RevDev uses `main` and `/docs`.
 
 1. Open the RevDev repository on GitHub.
 2. Go to **Settings**.
 3. Open **Pages**.
 4. Under **Build and deployment**, choose **Deploy from a branch**.
-5. Choose branch `main` (after the build branch has been merged).
+5. Choose branch `main`.
 6. Choose folder `/docs`.
 7. Click **Save**.
-8. Open the generated Pages URL shown by GitHub.
+8. Wait for GitHub Pages to build the site.
+9. Open the generated Pages URL shown by GitHub.
 
 GitHub documentation:
 https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site
 
-For GitHub Free, the repository must be public for GitHub Pages:
+GitHub notes that public repositories can use Pages with GitHub Free:
 https://docs.github.com/en/pages/getting-started-with-github-pages/creating-a-github-pages-site
 
 ## CDN libraries
@@ -94,9 +98,9 @@ Sources:
 - Mammoth: https://www.npmjs.com/package/mammoth
 - JSZip: https://stuk.github.io/jszip/
 
-## Privacy
+## Privacy and API-key safety
 
-Files are read in the browser. Only the extracted text is sent to the AI provider selected by the user. API keys are stored only in browser localStorage and are never committed to this repository.
+Files are read in the browser. Only extracted text is sent to the AI provider selected by the user. API keys are stored only in browser localStorage and are never committed to this repository.
 
 Important: a browser-side API key is visible to the person using the site. RevDev does not send it to its own server because RevDev has no server. Use a key you are comfortable using in a client-side application and follow the provider's key restrictions.
 
@@ -108,3 +112,7 @@ Scanned or image-only files are not OCRed in the current version. When a file co
 - Never commit API keys, tokens, passwords, or other secrets.
 - Keep the app static and free to run.
 - No build step is required.
+
+## Testing limitations
+
+This repository has been verified through the GitHub API/connector, including branch state, committed files, and secret-pattern checks. I could not run a real browser session against the live GitHub Pages deployment from this environment, and I could not make live Gemini or Groq API calls here. Therefore, CDN loading, browser file parsing, provider CORS/API behavior, quota behavior, and live GitHub Pages rendering still need to be tested in a normal browser.
