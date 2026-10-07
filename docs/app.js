@@ -1497,18 +1497,28 @@ function renderAnswerReview(outcomes) {
     questionText.textContent = outcome.question.question;
 
     const yourAnswer = document.createElement("p");
-    yourAnswer.innerHTML =
-      "<strong>Your answer:</strong> " +
-      (outcome.userAnswer || "[not answered]");
+    const yourLabel = document.createElement("strong");
+    yourLabel.textContent = "Your answer: ";
+    const yourValue = document.createTextNode(
+      outcome.userAnswer || "[not answered]"
+    );
+    yourAnswer.append(yourLabel, yourValue);
 
     const correctAnswer = document.createElement("p");
-    correctAnswer.innerHTML =
-      "<strong>Correct answer:</strong> " +
-      outcome.question.answers.join(" / ");
+    const correctLabel = document.createElement("strong");
+    correctLabel.textContent = "Correct answer: ";
+    const correctValue = document.createTextNode(
+      outcome.question.answers.join(" / ")
+    );
+    correctAnswer.append(correctLabel, correctValue);
 
     const explanation = document.createElement("p");
-    explanation.innerHTML =
-      "<strong>Explanation:</strong> " + outcome.question.explanation;
+    const explanationLabel = document.createElement("strong");
+    explanationLabel.textContent = "Explanation: ";
+    const explanationValue = document.createTextNode(
+      outcome.question.explanation
+    );
+    explanation.append(explanationLabel, explanationValue);
 
     item.append(heading, questionText, yourAnswer, correctAnswer, explanation);
     elements.answerReview.appendChild(item);
@@ -1544,9 +1554,7 @@ function escapeCsv(value) {
 function exportFlashcardsCsv() {
   if (state.cards.length === 0) return;
 
-  const rows = [
-    ["front", "back"]
-  ];
+  const rows = [["front", "back"]];
 
   state.cards.forEach(function (card) {
     rows.push([card.front, card.back]);
@@ -2000,7 +2008,7 @@ function resetGeneratedOutput() {
   elements.examResults.hidden = true;
   elements.retakeExam.hidden = true;
   elements.submitExam.hidden = false;
-  elements.examSubmitted = false;
+  state.examSubmitted = false;
   elements.generationStatus.textContent = "";
   elements.generationStatus.className = "status-message";
   setProgress(0, false);
@@ -2142,10 +2150,6 @@ elements.exportCsv.addEventListener("click", exportFlashcardsCsv);
 
 ["keydown"].forEach(function () {
   window.addEventListener("keydown", function (event) {
-    if (elements.flashcardsOutput.hidden || !elements.examOutput.hidden) {
-      if (elements.flashcardsOutput.hidden) return;
-    }
-
     if (!elements.flashcardsOutput.hidden) {
       if (event.key === "ArrowLeft") moveCard(-1);
       if (event.key === "ArrowRight") moveCard(1);
