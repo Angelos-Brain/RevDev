@@ -45,7 +45,7 @@ function formatBytes(bytes) {
 }
 
 function hasReadableText(text) {
-  return /[A-Za-z0-9À-ÖØ-öø-ÿ]/.test(text || "");
+  return /[\\p{L}\\p{N}]/u.test(text || "");
 }
 
 function cleanText(text) {
