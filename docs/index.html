@@ -162,9 +162,9 @@
         <div class="field">
           <label for="mode-select">Study mode</label>
           <select id="mode-select">
+            <option value="exam">Mock Exam</option>
             <option value="flashcards">Flashcards</option>
             <option value="summary">Summary Reviewer</option>
-            <option value="exam" disabled>Mock Exam — Milestone 3</option>
           </select>
         </div>
 
@@ -197,7 +197,7 @@
           <span class="section-kicker">FLASHCARDS</span>
           <h2>Your cards</h2>
         </div>
-        <span id="flashcard-count" class="mini-note">0 cards</span>
+        <div class="output-actions"><span id="flashcard-count" class="mini-note">0 cards</span><button class="button secondary small-button" id="export-csv" type="button">Export CSV</button></div>
       </div>
 
       <div class="flashcard-shell">
@@ -229,13 +229,60 @@
       <div class="card-stats" id="flashcard-stats"></div>
     </section>
 
+    <section class="card output-card exam-output" id="exam-output" hidden>
+      <div class="card-heading">
+        <div>
+          <span class="section-kicker">MOCK EXAM</span>
+          <h2>20-item practice exam</h2>
+        </div>
+        <div class="output-actions">
+          <span id="exam-count" class="mini-note">20 questions</span>
+          <button class="button secondary small-button" id="print-exam" type="button">Print</button>
+        </div>
+      </div>
+
+      <div id="exam-intro" class="exam-intro">
+        Answer all questions, then submit to see your score, correct answers, explanations, and weakest topics.
+      </div>
+
+      <form id="exam-form" class="exam-form"></form>
+
+      <div class="exam-actions">
+        <button class="button primary" id="submit-exam" type="button" disabled>Submit exam</button>
+        <button class="button secondary" id="retake-exam" type="button" hidden>Retake</button>
+      </div>
+
+      <div id="exam-results" class="exam-results" hidden>
+        <div class="score-panel">
+          <div>
+            <span class="score-label">SCORE</span>
+            <strong id="exam-score">0 / 20</strong>
+          </div>
+          <div>
+            <span class="score-label">PERCENT</span>
+            <strong id="exam-percent">0%</strong>
+          </div>
+        </div>
+
+        <div class="weak-topic-panel">
+          <h3>Weakest topics</h3>
+          <div id="weak-topics"></div>
+        </div>
+
+        <div>
+          <h3 class="results-heading">Answer review</h3>
+          <div id="answer-review" class="answer-review"></div>
+        </div>
+      </div>
+    </section>
+
     <section class="card output-card summary-output" id="summary-output" hidden>
       <div class="card-heading">
         <div>
           <span class="section-kicker">SUMMARY REVIEWER</span>
           <h2>Topic-by-topic reviewer</h2>
         </div>
-        <span id="summary-topic-count" class="mini-note">0 topics</span>
+        <div class="output-actions"><span id="summary-topic-count" class="mini-note">0 topics</span><button class="button secondary small-button" id="print-summary" type="button">Print to PDF</button></div>
       </div>
       <div id="summary-content"></div>
     </section>
