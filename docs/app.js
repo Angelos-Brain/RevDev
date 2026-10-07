@@ -28,7 +28,9 @@ const state = {
   topics: [],
   cards: [],
   cardRatings: new Map(),
-  cardIndex: 0
+  cardIndex: 0,
+  exam: [],
+  examSubmitted: false
 };
 
 const elements = {
@@ -69,7 +71,21 @@ const elements = {
   flashcardStats: document.getElementById("flashcard-stats"),
   summaryOutput: document.getElementById("summary-output"),
   summaryTopicCount: document.getElementById("summary-topic-count"),
-  summaryContent: document.getElementById("summary-content")
+  summaryContent: document.getElementById("summary-content"),
+  examOutput: document.getElementById("exam-output"),
+  examCount: document.getElementById("exam-count"),
+  examIntro: document.getElementById("exam-intro"),
+  examForm: document.getElementById("exam-form"),
+  submitExam: document.getElementById("submit-exam"),
+  retakeExam: document.getElementById("retake-exam"),
+  examResults: document.getElementById("exam-results"),
+  examScore: document.getElementById("exam-score"),
+  examPercent: document.getElementById("exam-percent"),
+  weakTopics: document.getElementById("weak-topics"),
+  answerReview: document.getElementById("answer-review"),
+  printExam: document.getElementById("print-exam"),
+  printSummary: document.getElementById("print-summary"),
+  exportCsv: document.getElementById("export-csv")
 };
 
 const FLASHCARD_SCHEMA = {
@@ -137,6 +153,47 @@ const SUMMARY_SCHEMA = {
             maxItems: 3,
             items: { type: "string" }
           }
+        }
+      }
+    }
+  }
+};
+
+const EXAM_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["questions"],
+  properties: {
+    questions: {
+      type: "array",
+      minItems: 0,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "id",
+          "type",
+          "topic",
+          "question",
+          "options",
+          "answers",
+          "explanation"
+        ],
+        properties: {
+          id: { type: "string" },
+          type: { type: "string" },
+          topic: { type: "string" },
+          question: { type: "string" },
+          options: {
+            type: "array",
+            items: { type: "string" }
+          },
+          answers: {
+            type: "array",
+            minItems: 1,
+            items: { type: "string" }
+          },
+          explanation: { type: "string" }
         }
       }
     }
@@ -652,6 +709,21 @@ function splitIntoChunks(text, maxCharacters) {
   return chunks;
 }
 
+function distributeExamQuota(total, chunkIndex, totalChunks) {
+  const base = Math.floor(total / totalChunks);
+  const remainder = total % totalChunks;
+  return base + (chunkIndex <= remainder ? 1 : 0);
+}
+
+function getExamQuota(chunkIndex, totalChunks) {
+  return {
+    multiple_choice: distributeExamQuota(10, chunkIndex, totalChunks),
+    true_false: distributeExamQuota(5, chunkIndex, totalChunks),
+    identification: distributeExamQuota(3, chunkIndex, totalChunks),
+    short_answer: distributeExamQuota(2, chunkIndex, totalChunks)
+  };
+}
+
 function buildPrompt(mode, chunk, chunkIndex, totalChunks) {
   const topicFocus = getTopicFocus();
 
@@ -665,13 +737,45 @@ function buildPrompt(mode, chunk, chunkIndex, totalChunks) {
           "Create 3 to 8 cards per chunk when the source supports them; fewer is acceptable when the chunk contains less material.",
           "Do not create cards from information that is not present."
         ].join(" ")
-      : [
-          "Create topic-based reviewer sections from only this source chunk.",
-          "For every topic, provide Key Concepts, Definitions, Formulas/Rules/Steps, Common Mistakes, and exactly 3 Self-check Questions.",
-          "Use empty arrays when a category is genuinely absent, but use [not in the files] when a specific requested fact is missing from the source.",
-          "Do not force unrelated facts into a topic.",
-          "Keep explanations plain and study-friendly."
-        ].join(" ");
+      : mode === "exam"
+        ? [
+            "Create a candidate section of a 20-item mock exam from only this source chunk.",
+            "The full exam must contain exactly 10 multiple_choice, 5 true_false, 3 identification, and 2 short_answer questions.",
+            "For this chunk, create exactly the quota stated below.",
+            "Every question must be answerable from the source text.",
+            "For multiple_choice, provide exactly 4 options and exactly 1 correct answer in the answers array.",
+            "For true_false, provide exactly 2 options: True and False, and exactly 1 correct answer.",
+            "For identification and short_answer, options must be an empty array and answers must contain one or more acceptable source-backed answers.",
+            "Include a short explanation for every correct answer.",
+            "Use concrete, source-specific wording and avoid duplicating generic questions from other chunks."
+          ].join(" ")
+        : [
+            "Create topic-based reviewer sections from only this source chunk.",
+            "For every topic, provide Key Concepts, Definitions, Formulas/Rules/Steps, Common Mistakes, and exactly 3 Self-check Questions.",
+            "Use empty arrays when a category is genuinely absent, but use [not in the files] when a specific requested fact is missing from the source.",
+            "Do not force unrelated facts into a topic.",
+            "Keep explanations plain and study-friendly."
+          ].join(" ");
+
+  if (mode === "exam") {
+    const quota = getExamQuota(chunkIndex, totalChunks);
+    return [
+      SYSTEM_INSTRUCTION,
+      "",
+      "TASK:",
+      modeRules,
+      topicFocus,
+      "This is chunk " + chunkIndex + " of " + totalChunks + ".",
+      "EXACT QUOTA FOR THIS CHUNK:",
+      JSON.stringify(quota),
+      "Use question type values exactly: multiple_choice, true_false, identification, short_answer.",
+      "",
+      "SOURCE TEXT:",
+      "<<<BEGIN SOURCE>>>",
+      chunk,
+      "<<<END SOURCE>>>"
+    ].join("\n");
+  }
 
   return [
     SYSTEM_INSTRUCTION,
@@ -801,6 +905,86 @@ function validateSummary(value) {
       );
     }
   });
+
+  return value;
+}
+
+function validateExam(value, expectedQuota) {
+  if (!value || typeof value !== "object" || !Array.isArray(value.questions)) {
+    throw new Error("Generated mock exam failed validation.");
+  }
+
+  const counts = {
+    multiple_choice: 0,
+    true_false: 0,
+    identification: 0,
+    short_answer: 0
+  };
+
+  value.questions.forEach(function (question, index) {
+    const path = "questions[" + index + "]";
+
+    if (!question || typeof question !== "object") {
+      throw new Error("Generated exam question " + (index + 1) + " failed validation.");
+    }
+
+    requireString(question.id, path + ".id");
+    requireString(question.type, path + ".type");
+    requireString(question.topic, path + ".topic");
+    requireString(question.question, path + ".question");
+    requireString(question.explanation, path + ".explanation");
+
+    if (!Object.prototype.hasOwnProperty.call(counts, question.type)) {
+      throw new Error("Generated exam question " + (index + 1) + " has an invalid type.");
+    }
+
+    if (!Array.isArray(question.options) || !Array.isArray(question.answers)) {
+      throw new Error("Generated exam question " + (index + 1) + " has invalid options or answers.");
+    }
+
+    question.options.forEach(function (option, optionIndex) {
+      requireString(option, path + ".options[" + optionIndex + "]");
+    });
+
+    question.answers.forEach(function (answer, answerIndex) {
+      requireString(answer, path + ".answers[" + answerIndex + "]");
+    });
+
+    if (question.type === "multiple_choice" && question.options.length !== 4) {
+      throw new Error("Each multiple-choice question must have exactly 4 options.");
+    }
+
+    if (question.type === "true_false" && question.options.length !== 2) {
+      throw new Error("Each true/false question must have exactly 2 options.");
+    }
+
+    if (
+      (question.type === "identification" || question.type === "short_answer") &&
+      question.options.length !== 0
+    ) {
+      throw new Error(
+        "Identification and short-answer questions must have no options."
+      );
+    }
+
+    counts[question.type] += 1;
+  });
+
+  if (expectedQuota) {
+    Object.keys(expectedQuota).forEach(function (type) {
+      if (counts[type] !== expectedQuota[type]) {
+        throw new Error(
+          "This exam chunk returned " +
+            counts[type] +
+            " " +
+            type +
+            " questions, but " +
+            expectedQuota[type] +
+            " were required."
+        );
+      }
+    });
+  }
 
   return value;
 }
@@ -1002,6 +1186,390 @@ function updateFlashcardDisplay() {
     known +
     " · Review again: " +
     review;
+}
+
+function mergeExams(partials) {
+  const seen = new Set();
+  const merged = [];
+
+  partials.forEach(function (result) {
+    result.questions.forEach(function (question) {
+      const key = normalizeText(question.question);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+
+      merged.push({
+        id: question.id,
+        type: question.type,
+        topic: question.topic,
+        question: question.question,
+        options: question.options.slice(),
+        answers: question.answers.slice(),
+        explanation: question.explanation
+      });
+    });
+  });
+
+  const targetCounts = {
+    multiple_choice: 10,
+    true_false: 5,
+    identification: 3,
+    short_answer: 2
+  };
+
+  const chosen = [];
+  const counts = {
+    multiple_choice: 0,
+    true_false: 0,
+    identification: 0,
+    short_answer: 0
+  };
+
+  Object.keys(targetCounts).forEach(function (type) {
+    merged.forEach(function (question) {
+      if (question.type === type && counts[type] < targetCounts[type]) {
+        chosen.push(question);
+        counts[type] += 1;
+      }
+    });
+  });
+
+  if (
+    counts.multiple_choice !== 10 ||
+    counts.true_false !== 5 ||
+    counts.identification !== 3 ||
+    counts.short_answer !== 2
+  ) {
+    throw new Error(
+      "The AI generated fewer than 20 unique source-backed exam questions. Try generating again or use a smaller topic focus."
+    );
+  }
+
+  return chosen;
+}
+
+function shuffleArray(items) {
+  const result = items.slice();
+
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const swapIndexValue = result[index];
+    result[index] = result[swapIndex];
+    result[swapIndex] = swapIndexValue;
+  }
+
+  return result;
+}
+
+function renderExam(questions) {
+  state.exam = shuffleArray(questions);
+  state.examSubmitted = false;
+
+  elements.flashcardsOutput.hidden = true;
+  elements.summaryOutput.hidden = true;
+  elements.examOutput.hidden = false;
+  elements.examCount.textContent =
+    state.exam.length + " questions";
+  elements.examResults.hidden = true;
+  elements.retakeExam.hidden = true;
+  elements.submitExam.hidden = false;
+  elements.submitExam.disabled = false;
+  elements.examIntro.textContent =
+    "Answer all 20 questions. Unanswered questions are scored as incorrect.";
+
+  elements.examForm.replaceChildren();
+
+  state.exam.forEach(function (question, index) {
+    const item = document.createElement("fieldset");
+    item.className = "exam-question";
+    item.dataset.index = String(index);
+
+    const legend = document.createElement("legend");
+
+    const number = document.createElement("span");
+    number.className = "question-number";
+    number.textContent = (index + 1).toString().padStart(2, "0");
+
+    const type = document.createElement("span");
+    type.className = "question-type";
+    type.textContent = getQuestionTypeLabel(question.type);
+
+    const text = document.createElement("span");
+    text.className = "question-text";
+    text.textContent = question.question;
+
+    legend.append(number, type, text);
+    item.appendChild(legend);
+
+    if (question.type === "multiple_choice" || question.type === "true_false") {
+      const options = document.createElement("div");
+      options.className = "question-options";
+
+      question.options.forEach(function (option, optionIndex) {
+        const label = document.createElement("label");
+        label.className = "choice-option";
+
+        const input = document.createElement("input");
+        input.type = "radio";
+        input.name = "question-" + index;
+        input.value = option;
+
+        const marker = document.createElement("span");
+        marker.className = "choice-marker";
+        marker.textContent = String.fromCharCode(65 + optionIndex);
+
+        const value = document.createElement("span");
+        value.textContent = option;
+
+        label.append(input, marker, value);
+        options.appendChild(label);
+      });
+
+      item.appendChild(options);
+    } else if (question.type === "identification") {
+      const input = document.createElement("input");
+      input.className = "answer-input";
+      input.type = "text";
+      input.name = "question-" + index;
+      input.autocomplete = "off";
+      input.placeholder = "Type your answer";
+      item.appendChild(input);
+    } else {
+      const textarea = document.createElement("textarea");
+      textarea.className = "answer-input answer-textarea";
+      textarea.name = "question-" + index;
+      textarea.rows = 3;
+      textarea.placeholder = "Type a short answer";
+      item.appendChild(textarea);
+    }
+
+    elements.examForm.appendChild(item);
+  });
+
+  elements.examOutput.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function getQuestionTypeLabel(type) {
+  switch (type) {
+    case "multiple_choice":
+      return "Multiple Choice";
+    case "true_false":
+      return "True / False";
+    case "identification":
+      return "Identification";
+    case "short_answer":
+      return "Short Answer";
+    default:
+      return type;
+  }
+}
+
+function normalizeAnswer(value) {
+  return normalizeText(value).replace(/\s+/g, " ").trim();
+}
+
+function answerMatches(userAnswer, acceptedAnswers) {
+  const normalizedUser = normalizeAnswer(userAnswer);
+  if (!normalizedUser) return false;
+
+  return acceptedAnswers.some(function (answer) {
+    const normalizedAccepted = normalizeAnswer(answer);
+    if (!normalizedAccepted) return false;
+    if (normalizedUser === normalizedAccepted) return true;
+
+    return (
+      normalizedAccepted.length >= 4 &&
+      (normalizedUser.includes(normalizedAccepted) ||
+        normalizedAccepted.includes(normalizedUser))
+    );
+  });
+}
+
+function submitExam() {
+  if (state.exam.length !== 20 || state.examSubmitted) return;
+
+  const formData = new FormData(elements.examForm);
+  const outcomes = [];
+  let score = 0;
+
+  state.exam.forEach(function (question, index) {
+    const userAnswer = String(formData.get("question-" + index) || "").trim();
+    const correct = answerMatches(userAnswer, question.answers);
+
+    if (correct) score += 1;
+
+    outcomes.push({
+      question: question,
+      userAnswer: userAnswer,
+      correct: correct
+    });
+  });
+
+  state.examSubmitted = true;
+  elements.submitExam.hidden = true;
+  elements.retakeExam.hidden = false;
+  elements.examResults.hidden = false;
+  elements.examScore.textContent = score + " / " + state.exam.length;
+  elements.examPercent.textContent =
+    Math.round((score / state.exam.length) * 100) + "%";
+
+  renderWeakTopics(outcomes);
+  renderAnswerReview(outcomes);
+  window.scrollTo({ top: elements.examOutput.offsetTop - 20, behavior: "smooth" });
+}
+
+function renderWeakTopics(outcomes) {
+  const byTopic = new Map();
+
+  outcomes.forEach(function (outcome) {
+    const key = normalizeText(outcome.question.topic) || "unknown";
+    if (!byTopic.has(key)) {
+      byTopic.set(key, {
+        topic: outcome.question.topic,
+        total: 0,
+        wrong: 0
+      });
+    }
+
+    const stats = byTopic.get(key);
+    stats.total += 1;
+    if (!outcome.correct) stats.wrong += 1;
+  });
+
+  const ranked = Array.from(byTopic.values()).sort(function (left, right) {
+    const leftRate = left.total ? left.wrong / left.total : 0;
+    const rightRate = right.total ? right.wrong / right.total : 0;
+    return rightRate - leftRate || right.wrong - left.wrong;
+  });
+
+  elements.weakTopics.replaceChildren();
+
+  const weak = ranked.filter(function (item) {
+    return item.wrong > 0;
+  });
+
+  if (weak.length === 0) {
+    const good = document.createElement("p");
+    good.className = "all-correct";
+    good.textContent = "No weak topics from this attempt. Great job!";
+    elements.weakTopics.appendChild(good);
+    return;
+  }
+
+  weak.slice(0, 5).forEach(function (item) {
+    const row = document.createElement("div");
+    row.className = "weak-topic";
+
+    const label = document.createElement("strong");
+    label.textContent = item.topic;
+
+    const detail = document.createElement("span");
+    detail.textContent =
+      item.wrong +
+      " wrong of " +
+      item.total +
+      " (" +
+      Math.round((item.wrong / item.total) * 100) +
+      "% missed)";
+
+    row.append(label, detail);
+    elements.weakTopics.appendChild(row);
+  });
+}
+
+function renderAnswerReview(outcomes) {
+  elements.answerReview.replaceChildren();
+
+  outcomes.forEach(function (outcome, index) {
+    const item = document.createElement("article");
+    item.className =
+      "answer-review-item " +
+      (outcome.correct ? "correct" : "incorrect");
+
+    const heading = document.createElement("h4");
+    heading.textContent =
+      (index + 1) +
+      ". " +
+      getQuestionTypeLabel(outcome.question.type);
+
+    const questionText = document.createElement("p");
+    questionText.className = "review-question";
+    questionText.textContent = outcome.question.question;
+
+    const yourAnswer = document.createElement("p");
+    yourAnswer.innerHTML =
+      "<strong>Your answer:</strong> " +
+      (outcome.userAnswer || "[not answered]");
+
+    const correctAnswer = document.createElement("p");
+    correctAnswer.innerHTML =
+      "<strong>Correct answer:</strong> " +
+      outcome.question.answers.join(" / ");
+
+    const explanation = document.createElement("p");
+    explanation.innerHTML =
+      "<strong>Explanation:</strong> " + outcome.question.explanation;
+
+    item.append(heading, questionText, yourAnswer, correctAnswer, explanation);
+    elements.answerReview.appendChild(item);
+  });
+}
+
+function retakeExam() {
+  if (state.exam.length !== 20) return;
+
+  state.examSubmitted = false;
+  renderExam(state.exam);
+  elements.examResults.hidden = true;
+}
+
+function printSection(section) {
+  const className = "print-" + section;
+  document.body.classList.add(className);
+
+  const cleanup = function () {
+    document.body.classList.remove(className);
+  };
+
+  window.addEventListener("afterprint", cleanup, { once: true });
+  window.print();
+
+  window.setTimeout(cleanup, 1500);
+}
+
+function escapeCsv(value) {
+  return '"' + String(value || "").replace(/"/g, '""') + '"';
+}
+
+function exportFlashcardsCsv() {
+  if (state.cards.length === 0) return;
+
+  const rows = [
+    ["front", "back"]
+  ];
+
+  state.cards.forEach(function (card) {
+    rows.push([card.front, card.back]);
+  });
+
+  const csv = rows
+    .map(function (row) {
+      return row.map(escapeCsv).join(",");
+    })
+    .join("\r\n");
+
+  const blob = new Blob(["\uFEFF" + csv], {
+    type: "text/csv;charset=utf-8"
+  });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "revdev-flashcards.csv";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function renderFlashcards(cards) {
@@ -1278,15 +1846,15 @@ async function generateWithGroq(prompt, schema) {
 async function generateChunk(prompt, mode) {
   const provider = elements.providerSelect.value;
 
+  let schema = SUMMARY_SCHEMA;
+  if (mode === "flashcards") schema = FLASHCARD_SCHEMA;
+  if (mode === "exam") schema = EXAM_SCHEMA;
+
   if (provider === "gemini") {
-    return mode === "flashcards"
-      ? generateWithGemini(prompt, FLASHCARD_SCHEMA)
-      : generateWithGemini(prompt, SUMMARY_SCHEMA);
+    return generateWithGemini(prompt, schema);
   }
 
-  return mode === "flashcards"
-    ? generateWithGroq(prompt, FLASHCARD_SCHEMA)
-    : generateWithGroq(prompt, SUMMARY_SCHEMA);
+  return generateWithGroq(prompt, schema);
 }
 
 async function generateMaterial() {
@@ -1356,6 +1924,10 @@ async function generateMaterial() {
 
       if (mode === "flashcards") {
         partials.push(validateFlashcards(result));
+      } else if (mode === "exam") {
+        partials.push(
+          validateExam(result, getExamQuota(index + 1, chunks.length))
+        );
       } else {
         partials.push(validateSummary(result));
       }
@@ -1375,6 +1947,13 @@ async function generateMaterial() {
       renderFlashcards(cards);
       setGenerationStatus(
         "Done. Generated " + cards.length + " unique flashcards.",
+        "success"
+      );
+    } else if (mode === "exam") {
+      const questions = mergeExams(partials);
+      renderExam(questions);
+      setGenerationStatus(
+        "Done. Generated a 20-item mock exam with 10 multiple choice, 5 true/false, 3 identification, and 2 short-answer questions.",
         "success"
       );
     } else {
@@ -1413,9 +1992,15 @@ async function generateMaterial() {
 function resetGeneratedOutput() {
   elements.flashcardsOutput.hidden = true;
   elements.summaryOutput.hidden = true;
+  elements.examOutput.hidden = true;
   elements.flashcardFront.textContent = "No cards generated yet.";
   elements.flashcardBack.textContent = "—";
   elements.summaryContent.replaceChildren();
+  elements.examForm.replaceChildren();
+  elements.examResults.hidden = true;
+  elements.retakeExam.hidden = true;
+  elements.submitExam.hidden = false;
+  elements.examSubmitted = false;
   elements.generationStatus.textContent = "";
   elements.generationStatus.className = "status-message";
   setProgress(0, false);
@@ -1545,16 +2130,29 @@ elements.knowCard.addEventListener("click", function () {
 });
 
 elements.shuffleCards.addEventListener("click", shuffleCards);
+elements.submitExam.addEventListener("click", submitExam);
+elements.retakeExam.addEventListener("click", retakeExam);
+elements.printExam.addEventListener("click", function () {
+  printSection("exam");
+});
+elements.printSummary.addEventListener("click", function () {
+  printSection("summary");
+});
+elements.exportCsv.addEventListener("click", exportFlashcardsCsv);
 
 ["keydown"].forEach(function () {
   window.addEventListener("keydown", function (event) {
-    if (elements.flashcardsOutput.hidden) return;
+    if (elements.flashcardsOutput.hidden || !elements.examOutput.hidden) {
+      if (elements.flashcardsOutput.hidden) return;
+    }
 
-    if (event.key === "ArrowLeft") moveCard(-1);
-    if (event.key === "ArrowRight") moveCard(1);
-    if (event.key === " " && document.activeElement !== elements.apiKey) {
-      event.preventDefault();
-      elements.flashcard.classList.toggle("is-flipped");
+    if (!elements.flashcardsOutput.hidden) {
+      if (event.key === "ArrowLeft") moveCard(-1);
+      if (event.key === "ArrowRight") moveCard(1);
+      if (event.key === " " && document.activeElement !== elements.apiKey) {
+        event.preventDefault();
+        elements.flashcard.classList.toggle("is-flipped");
+      }
     }
   });
 });
