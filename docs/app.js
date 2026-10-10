@@ -84,13 +84,35 @@ async function inflateBase64Gzip(b64) {
 }
 
 const QUALITY_RULES = [
-  "QUALITY RULES (mandatory):",
-  "- Test the SUBJECT MATTER a student must learn (concepts, definitions, how things work, comparisons, causes, steps, best practices).",
-  "- DO NOT ask about document metadata or layout: page counts, chapter numbers as navigation, table of contents, publication date, author, edition, preface-only trivia, file name, or how many pages the guide has.",
-  "- DO NOT ask \"which chapter covers X\" or \"on which page is Y\".",
-  "- Prefer questions like: What is…? How does…? Why is… used? What is the difference between…? What happens if…? Which statement is true about…?",
-  "- Wrong options must be plausible but clearly incorrect based on the source.",
-  "- Each explanation must teach the concept in 1–2 sentences, not just repeat the answer letter."
+  "QUALITY RULES (mandatory — follow every rule):",
+  "GOAL: Write HARD, concept-focused exam questions that test deep understanding of the subject.",
+  "",
+  "BANNED phrasing — never use these in question stems or options:",
+  "- according to the course files / according to the file(s) / according to the material / according to the study guide",
+  "- study guide, course file, document, handout, chapter, section, appendix, preface, table of contents",
+  "- supplemental materials, exam preparation resources, provided at the end of the guide",
+  "- how many pages, which chapter covers, on which page, prepared for, publication date",
+  "",
+  "BANNED question types:",
+  "- Document structure or navigation (TOC, chapters, page counts, appendices)",
+  "- Meta questions about the guide itself or how the course is organized",
+  "- Trivial recall of headings, titles, or what is listed at the end",
+  "- Soft/easy dictionary-style one-word definition dumps when deeper reasoning is possible",
+  "",
+  "REQUIRED difficulty (HARD):",
+  "- Prefer application, analysis, comparison, cause-effect, what happens if, multi-step reasoning",
+  "- Require understanding of relationships between concepts, not just naming a term",
+  "- Wrong options must be close, technical, and tempting (common misconceptions)",
+  "- Avoid questions a student could answer without studying the real content",
+  "",
+  "GOOD stems (examples of style, not content to copy):",
+  "- What is the primary reason X is used instead of Y?",
+  "- If condition A fails, which outcome is most likely?",
+  "- Which statement best distinguishes X from Y?",
+  "- Why does process Z require step N before step M?",
+  "",
+  "Write questions as a real subject exam. Never mention files, guides, or materials in the stem.",
+  "Each explanation must teach the underlying concept in 1-2 sentences."
 ].join("\n");
 
 const CDN = "https://cdn.jsdelivr.net/gh/Angelos-Brain/RevDev@3e34207/docs/";
@@ -115,14 +137,14 @@ await import(url);
       p = QUALITY_RULES + "\n\n" + p;
     }
     const sys = String(systemText || "") +
-      " You write high-quality study questions that test understanding of the subject, never document layout or metadata.";
+      " Write HARD subject-matter exam questions only. Never mention study guides, files, materials, chapters, pages, or document structure. Test concepts, reasoning, and application.";
     return original.call(this, p, schema, sys, preferredProvider, onStatus);
   };
   console.info("RevDev: quality prompt filter armed");
 })();
 
 function isMetaQuestion(q) {
-  return /how many (total )?pages|which chapter covers|table of contents|prepared for|publication date|page markers|how many chapters|document states it was prepared|file name|study guide span/i.test(q);
+  return /according to the (course )?file|according to the material|according to the study guide|study guide|course file|supplemental material|exam preparation|end of the guide|how many (total )?pages|which chapter covers|table of contents|prepared for|publication date|page markers|how many chapters|document states|file name|in the (preface|appendix)|provided at the end|handout|course material/i.test(q);
 }
 
 (function installFullCountFill() {
@@ -207,8 +229,9 @@ function isMetaQuestion(q) {
             : { multiple_choice: need };
           prompt = [
             QUALITY_RULES,
-            "Create EXACTLY " + need + " exam questions from ONLY this source text.",
+            "Create EXACTLY " + need + " HARD concept-focused exam questions from ONLY this source text.",
             "You MUST return exactly " + need + " questions. Do not return fewer.",
+            "Never mention study guides, files, materials, chapters, or pages in the stems.",
             "QUOTA: " + JSON.stringify(dist),
             "Types: multiple_choice, true_false, identification, short_answer.",
             avoidList.length ? "Do NOT repeat: " + JSON.stringify(avoidList) : "",
@@ -238,7 +261,7 @@ function isMetaQuestion(q) {
           prompt = [
             QUALITY_RULES,
             "Create EXACTLY " + need + " conceptual flashcards from ONLY this source.",
-            "Front = term or question; back = clear definition or answer. No page/chapter trivia.",
+            "Front = term or challenging question; back = clear definition or answer. No page/chapter/file trivia.",
             "You MUST return exactly " + need + " cards.",
             avoidList.length ? "Do NOT repeat fronts: " + JSON.stringify(avoidList) : "",
             "",
@@ -253,7 +276,7 @@ function isMetaQuestion(q) {
           const result = await window.__revdevRunBatch(
             prompt,
             schema,
-            "Use ONLY the source text. Return valid JSON. Never invent facts. Never test document layout.",
+            "Use ONLY the source text. Return valid JSON. Never invent facts. Never test document layout. Write HARD questions.",
             provider,
             function (msg) { setStatus(msg, ""); }
           );
@@ -312,7 +335,6 @@ function isMetaQuestion(q) {
   console.info("RevDev: full-count top-up armed");
 })();
 
-/* Retake exam: clear answers, remove grading, allow submit again */
 (function installRetakeExam() {
   function resetExamForm() {
     const form = document.getElementById("exam-form");
