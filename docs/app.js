@@ -1,4 +1,4 @@
-// RevDev bootstrap — configurable mock exam + Gemini free-tier fixes
+// RevDev bootstrap
 (function () {
   const originalFetch = window.fetch.bind(window);
   const GEMINI_FREE_MODEL = "gemini-3.5-flash-lite";
@@ -91,17 +91,6 @@
   };
 })();
 
-import { REVDEV_CHUNKS } from "./app.data.js";
-
-async function revdevLoadApp() {
-  const b64 = REVDEV_CHUNKS.join("");
-  const binary = Uint8Array.from(atob(b64), function (c) {
-    return c.charCodeAt(0);
-  });
-  const stream = new Response(binary).body.pipeThrough(new DecompressionStream("gzip"));
-  const source = await new Response(stream).text();
-  const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
-  await import(url);
-}
-
-await revdevLoadApp();
+await import(
+  "https://cdn.jsdelivr.net/gh/Angelos-Brain/RevDev@c151cf08a68250e6b1477b6f2c339246181b48f4/docs/app.js"
+);
