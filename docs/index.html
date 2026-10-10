@@ -82,7 +82,7 @@
             <span class="mode-number">01</span>
             <div>
               <strong>Mock Exam</strong>
-              <p>20-question exam with scoring, explanations, and weakest-topic feedback.</p>
+              <p>Custom item count and question types with scoring, explanations, and weakest-topic feedback.</p>
             </div>
           </div>
           <div class="mode-item active">
@@ -179,6 +179,44 @@
           <span class="field-label">Custom topic</span>
           <input id="custom-topic" type="text" placeholder="e.g. Binary Search time complexity" autocomplete="off">
         </label>
+      </div>
+
+      <div id="exam-options" class="exam-options" hidden>
+        <div class="exam-options-heading">
+          <span class="field-label">Mock exam options</span>
+          <span class="mini-note">Choose types and how many items</span>
+        </div>
+
+        <div class="exam-options-grid">
+          <label class="field exam-count-field">
+            <span class="field-label">Number of items</span>
+            <input id="exam-item-count" type="number" min="1" max="50" value="20" step="1" inputmode="numeric">
+            <span class="field-hint">1–50 questions (default 20)</span>
+          </label>
+
+          <fieldset class="exam-type-fieldset">
+            <legend class="field-label">Question types</legend>
+            <div class="exam-type-list">
+              <label class="check-option">
+                <input type="checkbox" name="exam-type" value="multiple_choice" checked>
+                <span>Multiple choice</span>
+              </label>
+              <label class="check-option">
+                <input type="checkbox" name="exam-type" value="true_false" checked>
+                <span>True / False</span>
+              </label>
+              <label class="check-option">
+                <input type="checkbox" name="exam-type" value="identification" checked>
+                <span>Identification</span>
+              </label>
+              <label class="check-option">
+                <input type="checkbox" name="exam-type" value="short_answer" checked>
+                <span>Short answer</span>
+              </label>
+            </div>
+            <span class="field-hint">Selected types share the item count as evenly as possible.</span>
+          </fieldset>
+        </div>
       </div>
 
       <div class="action-row">
