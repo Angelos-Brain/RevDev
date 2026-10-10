@@ -29,37 +29,16 @@
   grid-template-columns: 1fr 88px;
   gap: 12px;
   align-items: center;
-  border: none;
-  background: transparent;
-  padding: 0;
-  box-shadow: none;
 }
 
 .count-slider-row input[type="range"] {
   width: 100%;
   min-height: 28px;
   accent-color: var(--primary);
-  border: none;
+  border: none !important;
   outline: none;
+  box-shadow: none;
   background: transparent;
-  -webkit-appearance: none;
-  appearance: none;
-}
-.count-slider-row input[type="range"]::-webkit-slider-runnable-track {
-  height: 6px; border-radius: 999px; background: var(--line); border: none;
-}
-.count-slider-row input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none; appearance: none;
-  width: 18px; height: 18px; border-radius: 50%;
-  background: var(--primary); border: none; margin-top: -6px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2); cursor: pointer;
-}
-.count-slider-row input[type="range"]::-moz-range-track {
-  height: 6px; border-radius: 999px; background: var(--line); border: none;
-}
-.count-slider-row input[type="range"]::-moz-range-thumb {
-  width: 18px; height: 18px; border-radius: 50%;
-  background: var(--primary); border: none; cursor: pointer;
 }
 
 .count-slider-row input[type="number"] {

@@ -314,27 +314,15 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
 
 .exam-options { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
 .exam-options-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
-.count-slider-row { display: flex; align-items: center; gap: 12px; border: none; background: transparent; padding: 0; box-shadow: none; }
+.count-slider-row { display: flex; align-items: center; gap: 12px; }
 .count-slider-row input[type="range"] {
-  flex: 1; min-height: 28px; accent-color: var(--primary);
-  border: none; outline: none; background: transparent;
-  -webkit-appearance: none; appearance: none;
-}
-.count-slider-row input[type="range"]::-webkit-slider-runnable-track {
-  height: 6px; border-radius: 999px; background: var(--line); border: none;
-}
-.count-slider-row input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none; appearance: none;
-  width: 18px; height: 18px; border-radius: 50%;
-  background: var(--primary); border: none; margin-top: -6px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2); cursor: pointer;
-}
-.count-slider-row input[type="range"]::-moz-range-track {
-  height: 6px; border-radius: 999px; background: var(--line); border: none;
-}
-.count-slider-row input[type="range"]::-moz-range-thumb {
-  width: 18px; height: 18px; border-radius: 50%;
-  background: var(--primary); border: none; cursor: pointer;
+  flex: 1;
+  min-height: 28px;
+  accent-color: var(--primary);
+  border: none !important;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
 }
 .count-slider-row input[type="number"] { width: 72px; text-align: center; flex-shrink: 0; }
 .exam-type-fieldset { margin: 0; padding: 0; border: none; }
@@ -484,3 +472,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
   body { background: #fff; color: #000; }
 }
 [hidden] { display: none !important; }
+
+/* Range slider: no outer box, keep native filled track color via accent-color */
+input[type="range"] {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
