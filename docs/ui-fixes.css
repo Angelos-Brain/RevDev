@@ -165,3 +165,24 @@
     print-color-adjust: exact;
   }
 }
+
+/* Answer selection: ensure options are clickable above floated legend */
+.exam-question .question-options,
+.exam-question .answer-input,
+.exam-question .choice-option {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+}
+.exam-question .choice-option {
+  cursor: pointer;
+}
+.exam-question .choice-option.selected,
+.exam-question .choice-option:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.exam-question .choice-option input[type="radio"] {
+  pointer-events: auto;
+  cursor: pointer;
+}
