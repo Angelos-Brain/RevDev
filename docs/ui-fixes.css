@@ -38,25 +38,55 @@
   .progress-fill.is-indeterminate { animation: none; }
 }
 
-/* Mock exam: legend must not straddle the card border; number + type chip + text */
+/*
+ * Mock exam cards: browsers paint <legend> on the fieldset border line.
+ * float:left + width:100% pulls the whole legend (badge, chip, text) inside
+ * the card box so the top border no longer cuts through the question.
+ */
+.exam-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .exam-question {
+  display: block;
   margin: 0;
   min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius, 14px);
+  background: var(--surface-2);
+  box-sizing: border-box;
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
+
 .exam-question > legend {
+  float: left;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  max-width: 100%;
-  margin: 0 0 10px;
-  padding: 0;
-  float: none;
-  position: static;
-  border: 0;
-  box-sizing: border-box;
+  line-height: 1.45;
 }
+
+/* Clear the float so options (and any later siblings) sit below the legend */
+.exam-question > legend + *,
+.exam-question::after {
+  clear: both;
+}
+.exam-question::after {
+  content: "";
+  display: table;
+}
+
 .exam-question .question-number {
   display: inline-flex;
   align-items: center;
@@ -73,6 +103,7 @@
   letter-spacing: 0.02em;
   flex-shrink: 0;
 }
+
 .exam-question .question-type {
   display: inline-flex;
   align-items: center;
@@ -86,22 +117,36 @@
   text-transform: capitalize;
   flex-shrink: 0;
 }
+
 .exam-question .question-text {
   display: block;
   width: 100%;
   flex: 1 0 100%;
   font-weight: 600;
-  margin: 0;
+  margin: 10px 0 0;
+  padding: 0;
   line-height: 1.45;
   word-break: break-word;
 }
 
+.exam-question .question-options,
+.exam-question .answer-input {
+  margin-top: 14px;
+  clear: both;
+}
+
 @media print {
+  .exam-question {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
   .exam-question > legend {
+    float: left;
+    width: 100%;
     display: flex !important;
     flex-wrap: wrap;
     gap: 8px;
-    margin-bottom: 8px;
+    margin: 0 0 10px;
   }
   .exam-question .question-text {
     display: block !important;
