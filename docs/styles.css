@@ -177,8 +177,21 @@ h1 {
   transition: background var(--ease), color var(--ease);
 }
 .stepper-num {
-  width: 24px; height: 24px; border-radius: var(--radius-full); display: grid; place-items: center;
-  background: var(--surface); border: 1px solid var(--line); font-size: 0.72rem; font-weight: 700; flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+  text-align: center;
+  padding: 0;
+  box-sizing: border-box;
 }
 .stepper-item.is-active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
 .stepper-item.is-active .stepper-num { background: var(--primary); border-color: var(--primary); color: #fff; }
