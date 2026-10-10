@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="RevDev turns your study files into exam-ready review material.">
   <title>RevDev — Study File Reader</title>
-  <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="exam-options.css">
+  <link rel="stylesheet" href="styles.css?v=dual1">
+  <link rel="stylesheet" href="exam-options.css?v=dual1">
+  <link rel="stylesheet" href="exam-feedback.css?v=10">
 </head>
 <body>
   <header class="site-header">
@@ -18,7 +19,7 @@
           <small>Study smarter from your files.</small>
         </span>
       </a>
-      <span class="status-pill">Local AI · 1–100 items · WebGPU</span>
+      <span class="status-pill">Free AI · Gemini + Groq failover</span>
     </div>
   </header>
 
@@ -28,8 +29,7 @@
         <span class="eyebrow">FREE · BROWSER-FIRST</span>
         <h1>Turn your study files into a review workspace.</h1>
         <p class="hero-copy">
-          Upload your files, keep the source text in your browser, then generate study material with free
-          in-browser AI models — no API key required.
+          Upload your files, keep the source text in your browser, then add free Gemini and/or Groq API keys. RevDev switches automatically if one provider runs out of quota.
         </p>
       </div>
     </section>
@@ -38,7 +38,7 @@
       <span class="privacy-icon" aria-hidden="true">✓</span>
       <div>
         <strong>Privacy by design</strong>
-        <p>Files are read in your browser. Files and generation stay in this browser. Models download into your browser cache; no API key is required.</p>
+        <p>Files are read in your browser. Only extracted text is sent to the AI providers whose keys you saved (Gemini and/or Groq). During failover both may be used. Keys stay in this browser only.</p>
       </div>
     </section>
 
@@ -76,28 +76,28 @@
       </div>
 
       <aside class="card next-card">
-        <span class="section-kicker">NOW AVAILABLE</span>
+        <span class="section-kicker">STUDY MODES</span>
         <h2>Study modes</h2>
         <div class="mode-list">
           <div class="mode-item active">
             <span class="mode-number">01</span>
             <div>
               <strong>Mock Exam</strong>
-              <p>Custom item count and question types with scoring, explanations, and weakest-topic feedback.</p>
+              <p>Custom item count (1–100) and question types with scoring and explanations.</p>
             </div>
           </div>
           <div class="mode-item active">
             <span class="mode-number">02</span>
             <div>
               <strong>Flashcards</strong>
-              <p>Generate, flip, self-rate, and study cards from the uploaded text.</p>
+              <p>Generate, flip, and study cards from the uploaded text.</p>
             </div>
           </div>
           <div class="mode-item active">
             <span class="mode-number">03</span>
             <div>
               <strong>Summary Reviewer</strong>
-              <p>Generate topic sections with concepts, definitions, rules, mistakes, and self-checks.</p>
+              <p>Topic sections with concepts, definitions, rules, mistakes, and self-checks.</p>
             </div>
           </div>
         </div>
@@ -107,44 +107,63 @@
     <section class="card ai-card">
       <div class="card-heading">
         <div>
-          <span class="section-kicker">2 · LOCAL AI MODEL</span>
-          <h2>Choose an in-browser model</h2>
+          <span class="section-kicker">2 · CONNECT FREE AI</span>
+          <h2>Gemini & Groq keys</h2>
         </div>
-        <span class="mini-note">No API key · WebGPU</span>
+        <span class="mini-note">Auto-failover · No backend</span>
       </div>
 
       <p class="model-intro">
-        Models run on your device with WebGPU. First use downloads weights into this browser’s cache.
-        Nothing is sent to a remote API.
+        Save one or both free API keys. Choose a primary provider; RevDev switches to the other
+        automatically if a rate limit or quota error occurs.
       </p>
 
-      <div class="settings-grid model-settings">
+      <div class="settings-grid">
         <label class="field">
-          <span class="field-label">Model</span>
-          <select id="model-select"></select>
+          <span class="field-label">Primary provider</span>
+          <select id="provider-select">
+            <option value="gemini">Google Gemini (primary)</option>
+            <option value="groq">Groq (primary)</option>
+          </select>
         </label>
-        <div class="field model-status-field">
-          <span class="field-label">Status</span>
-          <div id="model-status" class="model-status">Checking WebGPU…</div>
-          <div id="model-progress" class="progress" hidden>
-            <div class="progress-track"><div class="progress-fill" id="model-progress-fill"></div></div>
-          </div>
+        <div class="field">
+          <span class="field-label">Keys saved</span>
+          <div id="keys-status" class="keys-status">No keys saved yet</div>
         </div>
       </div>
 
-      <div class="model-meta" id="model-meta"></div>
-
-      <div class="fallback-row">
-        <label class="check-option">
-          <input type="checkbox" id="auto-fallback" checked>
-          <span>Auto-switch to another model if this one fails</span>
+      <div class="settings-grid" style="margin-top:12px">
+        <label class="field api-key-field">
+          <span class="field-label">Gemini API key</span>
+          <div class="api-key-row">
+            <input id="api-key-gemini" type="password" placeholder="Paste free Gemini key (optional if Groq set)" autocomplete="off" spellcheck="false">
+            <button class="button secondary small-button" id="toggle-key-gemini" type="button">Show</button>
+          </div>
         </label>
-        <button class="button secondary small-button" id="load-model-button" type="button">Load model</button>
+        <label class="field api-key-field">
+          <span class="field-label">Groq API key</span>
+          <div class="api-key-row">
+            <input id="api-key-groq" type="password" placeholder="Paste free Groq key (optional if Gemini set)" autocomplete="off" spellcheck="false">
+            <button class="button secondary small-button" id="toggle-key-groq" type="button">Show</button>
+          </div>
+        </label>
       </div>
 
-      <p class="storage-note">
-        <span class="dot"></span>
-        Downloaded models stay in this browser. You can pick a smaller model if download or memory fails.
+      <input id="api-key" type="hidden" value="">
+
+      <div id="gemini-help" class="provider-help">
+        <strong>Gemini</strong>
+        <p>Free key from Google AI Studio. Model: <code>gemini-3.5-flash-lite</code>. When both keys are saved, RevDev switches automatically on quota limits.</p>
+        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Open Google AI Studio</a>
+      </div>
+      <div id="groq-help" class="provider-help">
+        <strong>Groq</strong>
+        <p>Free key from Groq Console. Used as primary or automatic backup when Gemini hits a limit.</p>
+        <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Open Groq Console</a>
+      </div>
+
+      <p class="storage-note"><span class="dot"></span>
+        Keys are stored only in this browser's localStorage and are sent only to the provider you use.
       </p>
     </section>
 
@@ -190,7 +209,7 @@
           <input id="item-count-slider" type="range" min="1" max="100" value="20" step="1">
           <input id="item-count" type="number" min="1" max="100" value="20" step="1" inputmode="numeric">
         </div>
-        <p class="field-hint" id="count-mode-hint">Applies to exam questions, flashcards, or summary topics depending on the study mode.</p>
+        <p class="field-hint" id="count-mode-hint">Applies to exam questions, flashcards, or summary topics. Generated in batches of ~20 with automatic provider failover.</p>
       </div>
 
       <div id="exam-options" class="exam-options">
@@ -218,7 +237,7 @@
               <span>Short answer</span>
             </label>
           </div>
-          <span class="field-hint">Selected types share the item count as evenly as possible.</span>
+          <span class="field-hint">Selected types share the item count as evenly as possible across the full exam.</span>
         </fieldset>
       </div>
 
@@ -256,7 +275,6 @@
           <button class="button secondary small-button" id="export-csv" type="button">Export CSV</button>
         </div>
       </div>
-
       <div class="flashcard-shell">
         <button class="flashcard" id="flashcard" type="button" aria-label="Flip flashcard">
           <span class="flashcard-face flashcard-front">
@@ -269,19 +287,16 @@
           </span>
         </button>
       </div>
-
       <div class="flashcard-controls">
         <button class="button secondary" id="previous-card" type="button">Previous</button>
         <span id="flashcard-position" class="card-position">0 / 0</span>
         <button class="button secondary" id="next-card" type="button">Next</button>
       </div>
-
       <div class="rating-row">
         <button class="button secondary" id="review-again" type="button">Review again</button>
         <button class="button primary" id="know-card" type="button">I know it</button>
         <button class="button secondary" id="shuffle-cards" type="button">Shuffle</button>
       </div>
-
       <div class="card-stats" id="flashcard-stats"></div>
     </section>
 
@@ -310,15 +325,12 @@
           <button class="button secondary small-button" id="print-exam" type="button">Print</button>
         </div>
       </div>
-
       <div id="exam-intro" class="exam-intro"></div>
       <form id="exam-form" class="exam-form"></form>
-
       <div class="exam-actions">
         <button class="button primary" id="submit-exam" type="button">Submit answers</button>
         <button class="button secondary" id="retake-exam" type="button" hidden>Retake</button>
       </div>
-
       <div id="exam-results" class="exam-results" hidden>
         <div class="score-row">
           <div>
@@ -338,12 +350,12 @@
 
   <footer class="site-footer">
     <div class="shell footer-inner">
-      <p>RevDev runs entirely in your browser. No account, no backend, no paid service required.</p>
+      <p>RevDev dual-key failover · Runs in your browser · No account, no backend, no paid service required.</p>
     </div>
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.2/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mammoth@1.13.0/mammoth.browser.min.js"></script>
-  <script type="module" src="./app.js"></script>
+  <script type="module" src="./app.js?v=dual1"></script>
 </body>
 </html>
