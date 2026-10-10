@@ -236,12 +236,6 @@ h1 {
 @media (min-width: 900px) {
   .workspace { grid-template-columns: 1.4fr 0.9fr; align-items: start; }
 }
-/* Mobile/tablet: hide study-modes guide — mode is chosen in Generate */
-@media (max-width: 899px) {
-  aside.next-card,
-  .workspace > .next-card,
-  .next-card { display: none !important; }
-}
 
 .dropzone {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
