@@ -1,4 +1,4 @@
-/* RevDev loader: dual-key app + quality exam prompts + full-count top-up */
+/* RevDev loader: dual-key app + quality exam prompts + full-count top-up + retake */
 (function ensureLegacyElements() {
   const stubs = [
     { id: "toggle-key", tag: "button", type: "button" },
@@ -104,7 +104,6 @@ const source = await inflateBase64Gzip(parts.join(""));
 const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
 await import(url);
 
-/* Inject quality rules into every AI batch prompt */
 (function patchPromptQuality() {
   if (typeof window.__revdevRunBatch !== "function") return;
   const original = window.__revdevRunBatch;
@@ -126,7 +125,6 @@ function isMetaQuestion(q) {
   return /how many (total )?pages|which chapter covers|table of contents|prepared for|publication date|page markers|how many chapters|document states it was prepared|file name|study guide span/i.test(q);
 }
 
-/* Full-count top-up if dual finishes short */
 (function installFullCountFill() {
   function setStatus(msg, kind) {
     const el = document.getElementById("generation-status");
@@ -312,4 +310,80 @@ function isMetaQuestion(q) {
   });
   observer.observe(statusEl, { childList: true, characterData: true, subtree: true });
   console.info("RevDev: full-count top-up armed");
+})();
+
+/* Retake exam: clear answers, remove grading, allow submit again */
+(function installRetakeExam() {
+  function resetExamForm() {
+    const form = document.getElementById("exam-form");
+    const results = document.getElementById("exam-results");
+    const submitBtn = document.getElementById("submit-exam");
+    const retakeBtn = document.getElementById("retake-exam");
+    const answerReview = document.getElementById("answer-review");
+    const weakTopics = document.getElementById("weak-topics");
+    const scoreEl = document.getElementById("exam-score");
+    const percentEl = document.getElementById("exam-percent");
+
+    if (form) {
+      form.querySelectorAll(".exam-question").forEach(function (fs) {
+        fs.classList.remove("is-correct", "is-incorrect");
+        fs.querySelectorAll(".choice-option").forEach(function (opt) {
+          opt.classList.remove("is-correct", "is-user-wrong", "is-right-answer");
+        });
+        fs.querySelectorAll("input, textarea, select").forEach(function (el) {
+          el.disabled = false;
+          if (el.type === "radio" || el.type === "checkbox") el.checked = false;
+          else el.value = "";
+        });
+        fs.querySelectorAll(".explanation-box, .exam-explanation, .answer-feedback").forEach(function (box) {
+          box.remove();
+        });
+      });
+    }
+
+    if (results) results.hidden = true;
+    if (answerReview) answerReview.innerHTML = "";
+    if (weakTopics) weakTopics.innerHTML = "";
+    if (scoreEl) scoreEl.textContent = "0 / 0";
+    if (percentEl) percentEl.textContent = "0%";
+    if (submitBtn) {
+      submitBtn.hidden = false;
+      submitBtn.disabled = false;
+    }
+    if (retakeBtn) retakeBtn.hidden = true;
+
+    if (form) form.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function bindRetake() {
+    const retakeBtn = document.getElementById("retake-exam");
+    if (!retakeBtn || retakeBtn.dataset.revdevRetakeBound === "1") return;
+    retakeBtn.dataset.revdevRetakeBound = "1";
+    retakeBtn.type = "button";
+    retakeBtn.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      resetExamForm();
+    });
+  }
+
+  bindRetake();
+  setTimeout(bindRetake, 500);
+  setTimeout(bindRetake, 1500);
+
+  document.addEventListener(
+    "click",
+    function (event) {
+      const btn = event.target && event.target.closest
+        ? event.target.closest("#retake-exam")
+        : null;
+      if (!btn) return;
+      event.preventDefault();
+      event.stopPropagation();
+      resetExamForm();
+    },
+    true
+  );
+
+  console.info("RevDev: exam retake armed");
 })();
