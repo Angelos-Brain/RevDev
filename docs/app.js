@@ -10,10 +10,13 @@ async function inflateBase64Gzip(b64) {
 }
 
 const base = new URL("./", import.meta.url);
-const parts = await Promise.all([
-  fetch(new URL("app.payload.0.txt", base)).then((r) => r.text()),
-  fetch(new URL("app.payload.1.txt", base)).then((r) => r.text())
-]);
+const names = ["pl.0.txt","pl.1.txt","pl.2.txt","pl.3.txt","pl.4.txt","pl.5.txt","pl.6.txt"];
+const parts = await Promise.all(
+  names.map((n) => fetch(new URL(n, base)).then((r) => {
+    if (!r.ok) throw new Error("Missing " + n);
+    return r.text();
+  }))
+);
 const source = await inflateBase64Gzip(parts.join("").replace(/\s+/g, ""));
 const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
 await import(url);
