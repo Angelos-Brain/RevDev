@@ -1,1 +1,1 @@
-import "./app.core.js";
+/* loader will be filled */
