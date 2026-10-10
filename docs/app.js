@@ -1,20 +1,11 @@
-// RevDev bootstrap
-// 1) Use Gemini Flash-Lite free-tier model currently available to new users.
-// 2) Strip unsupported "additionalProperties" from Gemini responseSchema.
-// 3) Rewrite rate-limit / quota errors into clear student-friendly messages.
-// 4) Load the last known-good full application module.
+// RevDev bootstrap — configurable mock exam + Gemini free-tier fixes
 (function () {
   const originalFetch = window.fetch.bind(window);
-
   const GEMINI_FREE_MODEL = "gemini-3.5-flash-lite";
 
   function stripAdditionalProperties(value) {
-    if (Array.isArray(value)) {
-      return value.map(stripAdditionalProperties);
-    }
-    if (!value || typeof value !== "object") {
-      return value;
-    }
+    if (Array.isArray(value)) return value.map(stripAdditionalProperties);
+    if (!value || typeof value !== "object") return value;
     const cleaned = {};
     Object.keys(value).forEach(function (key) {
       if (key === "additionalProperties") return;
@@ -37,8 +28,7 @@
 
   function friendlyRateLimitMessage(provider) {
     return (
-      "The " +
-      provider +
+      "The " + provider +
       " free-tier limit was reached for this project. " +
       "Wait a few minutes (or until midnight Pacific for daily quotas), " +
       "try a smaller file, or switch provider to Groq and use a free Groq key."
@@ -51,7 +41,6 @@
 
     if (typeof requestUrl === "string" && requestUrl.includes("generativelanguage.googleapis.com")) {
       requestUrl = requestUrl.replace(/models\/[^:]+/, "models/" + encodeURIComponent(GEMINI_FREE_MODEL));
-
       if (requestOptions && typeof requestOptions.body === "string") {
         try {
           var body = JSON.parse(requestOptions.body);
@@ -63,7 +52,7 @@
               body: JSON.stringify(body)
             });
           }
-        } catch (error) {}
+        } catch (e) {}
       }
     }
 
@@ -73,40 +62,46 @@
       if (!response.ok && (response.status === 429 || response.status === 403)) {
         var cloned = response.clone();
         var errorBody = null;
-        try {
-          errorBody = await cloned.json();
-        } catch (parseError) {
-          errorBody = null;
-        }
-
+        try { errorBody = await cloned.json(); } catch (e) { errorBody = null; }
         if (response.status === 429 || isRateLimitBody(errorBody)) {
-          var provider = requestUrl.includes("generativelanguage.googleapis.com")
+          var provider = String(requestUrl).includes("generativelanguage.googleapis.com")
             ? "Gemini"
-            : requestUrl.includes("api.groq.com")
+            : String(requestUrl).includes("api.groq.com")
               ? "Groq"
               : "AI provider";
-
-          var payload = {
-            error: {
-              message: friendlyRateLimitMessage(provider),
-              status: "RESOURCE_EXHAUSTED",
-              code: 429
+          return new Response(
+            JSON.stringify({
+              error: {
+                message: friendlyRateLimitMessage(provider),
+                status: "RESOURCE_EXHAUSTED",
+                code: 429
+              }
+            }),
+            {
+              status: 429,
+              statusText: "Too Many Requests",
+              headers: { "Content-Type": "application/json" }
             }
-          };
-
-          return new Response(JSON.stringify(payload), {
-            status: 429,
-            statusText: "Too Many Requests",
-            headers: { "Content-Type": "application/json" }
-          });
+          );
         }
       }
-    } catch (rewriteError) {}
+    } catch (e) {}
 
     return response;
   };
 })();
 
-await import(
-  "https://cdn.jsdelivr.net/gh/Angelos-Brain/RevDev@c151cf08a68250e6b1477b6f2c339246181b48f4/docs/app.js"
-);
+import { REVDEV_CHUNKS } from "./app.data.js";
+
+async function revdevLoadApp() {
+  const b64 = REVDEV_CHUNKS.join("");
+  const binary = Uint8Array.from(atob(b64), function (c) {
+    return c.charCodeAt(0);
+  });
+  const stream = new Response(binary).body.pipeThrough(new DecompressionStream("gzip"));
+  const source = await new Response(stream).text();
+  const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
+  await import(url);
+}
+
+await revdevLoadApp();
