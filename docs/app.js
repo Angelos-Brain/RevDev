@@ -1,4 +1,4 @@
-/* RevDev bootstrap — fetch gzip base64 parts, repair known packing artifact, run */
+/* RevDev bootstrap — load known-good gzip payload, repair packing artifact, run */
 async function inflateBase64Gzip(b64) {
   const binary = atob(b64);
   const bytes = new Uint8Array(binary.length);
@@ -17,14 +17,18 @@ function repairPackedSource(source) {
   );
 }
 
-const base = new URL("./", import.meta.url);
+// Pin to last known-good payload commit (avoids corrupted local pl.0/pl.1).
+const PAYLOAD_BASE =
+  "https://raw.githubusercontent.com/Angelos-Brain/RevDev/7128c143/docs/";
 const names = ["pl.0.txt","pl.1.txt","pl.2.txt","pl.3.txt","pl.4.txt","pl.5.txt","pl.6.txt"];
 const parts = await Promise.all(
-  names.map((n) => fetch(new URL(n, base)).then((r) => {
-    if (!r.ok) throw new Error("Missing " + n);
+  names.map((n) => fetch(PAYLOAD_BASE + n).then((r) => {
+    if (!r.ok) throw new Error("Missing payload " + n + " (" + r.status + ")");
     return r.text();
   }))
 );
-const source = repairPackedSource(await inflateBase64Gzip(parts.join("").replace(/\s+/g, "")));
+const source = repairPackedSource(
+  await inflateBase64Gzip(parts.join("").replace(/\s+/g, ""))
+);
 const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
 await import(url);
