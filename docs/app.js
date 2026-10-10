@@ -8,9 +8,12 @@ async function inflateBase64Gzip(b64) {
   const buf = await new Response(stream).arrayBuffer();
   return new TextDecoder().decode(buf);
 }
-const res = await fetch("./dual.b64.txt?v=2");
-if (!res.ok) throw new Error("Missing dual.b64.txt — redeploy payload");
-const b64 = (await res.text()).replace(/\s+/g, "");
-const source = await inflateBase64Gzip(b64);
+const parts = [];
+for (let i = 0; i < 4; i++) {
+  const res = await fetch("./dual_c" + i + ".txt?v=1");
+  if (!res.ok) throw new Error("Missing dual_c" + i + ".txt");
+  parts.push((await res.text()).replace(/\s+/g, ""));
+}
+const source = await inflateBase64Gzip(parts.join(""));
 const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
 await import(url);
