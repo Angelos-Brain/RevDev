@@ -1,4 +1,4 @@
-/* RevDev cloud bootstrap v8 — inline green/red exam feedback on the form */
+/* RevDev cloud bootstrap v9 — green/red choices + explanation only */
 (function () {
   const originalFetch = window.fetch.bind(window);
   const GEMINI_FREE_MODEL = "gemini-3.5-flash-lite";
@@ -67,7 +67,7 @@ function ensureCloudAiUi() {
   if (!document.querySelector('link[href*="exam-feedback.css"]')) {
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "exam-feedback.css?v=8";
+    link.href = "exam-feedback.css?v=9";
     document.head.appendChild(link);
   }
   const aiCard = document.querySelector(".ai-card");
@@ -221,7 +221,7 @@ function patchExamConfig(source) {
   return source;
 }
 
-/** Mark each question on the answer form: green = correct, red = wrong. */
+/** Mark each question on the form: green/red on choices; explanation only underneath. */
 window.__revdevMarkExamForm = function (outcomes) {
   const form = document.getElementById("exam-form");
   if (!form || !outcomes || !outcomes.length) return;
@@ -248,6 +248,7 @@ window.__revdevMarkExamForm = function (outcomes) {
       }
     }
 
+    // If wrong, also outline the correct option(s)
     if (!outcome.correct && outcome.question && outcome.question.answers) {
       const accepted = outcome.question.answers.map(function (a) {
         return String(a).trim().toLowerCase();
@@ -260,24 +261,22 @@ window.__revdevMarkExamForm = function (outcomes) {
       });
     }
 
+    // Bottom of card: explanation only (choices already show right/wrong)
     let box = fieldset.querySelector(".exam-inline-result");
+    const expl =
+      outcome.question && outcome.question.explanation
+        ? String(outcome.question.explanation).trim()
+        : "";
+    if (!expl) {
+      if (box) box.remove();
+      return;
+    }
     if (!box) {
       box = document.createElement("div");
       box.className = "exam-inline-result";
       fieldset.appendChild(box);
     }
-    const correctText = (outcome.question.answers || []).join(" / ") || "—";
-    const userText = outcome.userAnswer || "[not answered]";
-    const expl = outcome.question.explanation ? outcome.question.explanation : "";
-    box.innerHTML =
-      "<strong>" +
-      (outcome.correct ? "Correct" : "Incorrect") +
-      "</strong>" +
-      "Your answer: " +
-      userText +
-      "<br>Correct answer: " +
-      correctText +
-      (expl ? "<br>Explanation: " + expl : "");
+    box.innerHTML = "<strong>Explanation</strong>" + expl;
   });
 };
 
@@ -286,7 +285,6 @@ function installSubmitFallback() {
   const form = document.getElementById("exam-form");
   const results = document.getElementById("exam-results");
   if (!btn || !form) return;
-
   btn.addEventListener(
     "click",
     function () {
@@ -305,7 +303,7 @@ const CDN_APP =
 async function revdevLoadApp() {
   ensureCloudAiUi();
   wireItemCountControls();
-  const response = await fetch(CDN_APP + "?v=examfix8");
+  const response = await fetch(CDN_APP + "?v=examfix9");
   if (!response.ok) throw new Error("Could not load RevDev application module.");
   let source = await response.text();
   source = patchExamConfig(source);
@@ -313,7 +311,7 @@ async function revdevLoadApp() {
   if (/state\.exam\.length !== 20/.test(source)) {
     console.error("RevDev: length!==20 still present after patch");
   } else {
-    console.info("RevDev: inline exam feedback ready (v8)");
+    console.info("RevDev: inline exam feedback ready (v9)");
   }
 
   const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
