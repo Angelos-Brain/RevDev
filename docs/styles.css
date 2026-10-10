@@ -293,8 +293,11 @@ h1 {
 .mode-item p { margin: 0; font-size: 0.8rem; color: var(--muted); line-height: 1.4; }
 
 .settings-grid, .generator-grid, .dual-key-grid, .provider-help-grid { display: grid; gap: 14px; }
+.dual-key-grid { margin-top: 4px; margin-bottom: 4px; }
+.provider-help-grid { margin-top: 20px; }
 @media (min-width: 640px) {
   .settings-grid, .generator-grid, .dual-key-grid, .provider-help-grid { grid-template-columns: 1fr 1fr; }
+  .provider-help-grid { margin-top: 22px; gap: 16px; }
 }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-label { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); }
@@ -314,7 +317,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
   font-size: 0.85rem; font-weight: 600; color: var(--muted);
 }
 .provider-help {
-  padding: 14px; border-radius: var(--radius-sm); background: var(--surface-2);
+  padding: 16px; border-radius: var(--radius-sm); background: var(--surface-2);
   border: 1px solid var(--line); font-size: 0.85rem;
 }
 .provider-help strong { display: block; margin-bottom: 4px; }
