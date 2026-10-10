@@ -1,4 +1,4 @@
-/* RevDev UI fixes: progress bar + mock exam question headers */
+/* RevDev UI fixes: progress bar + mock exam question headers + focus + marks */
 
 /* Progress track needs explicit height so the fill is visible */
 .progress {
@@ -240,20 +240,6 @@
   line-height: 1;
 }
 
-.choice-option .result-mark {
-  margin-left: auto;
-  font-weight: 900;
-  font-size: 0.95rem;
-  line-height: 1;
-  flex-shrink: 0;
-}
-.choice-option .result-mark-check { color: var(--success); }
-.choice-option .result-mark-cross { color: var(--danger); }
-
-.exam-question .choice-option {
-  grid-template-columns: 18px 28px minmax(0, 1fr) auto;
-}
-
 .review-answer-line {
   margin-top: 12px;
   font-size: 0.88rem;
@@ -269,6 +255,111 @@
   font-weight: 600;
 }
 
+/* --------------------------------------------------------------------------
+ * Option row: 4 columns (radio | letter | text | mark) so the check/X never
+ * wraps under the radio. Higher specificity beats exam-feedback.css 3-col grid.
+ * Reserve the mark column in taking mode too to avoid layout shift on review.
+ * -------------------------------------------------------------------------- */
+#exam-form .exam-question .choice-option {
+  display: grid;
+  grid-template-columns: 18px 28px minmax(0, 1fr) 28px;
+  column-gap: 10px;
+  align-items: center;
+}
+#exam-form .exam-question .choice-option > span:nth-child(3) {
+  min-width: 0;
+  line-height: 1.35;
+  word-break: break-word;
+}
+#exam-form .exam-question .choice-option .result-mark {
+  grid-column: 4;
+  justify-self: center;
+  align-self: center;
+  margin: 0;
+  width: 20px;
+  height: 20px;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+#exam-form .exam-question .choice-option .result-mark-check {
+  color: var(--success);
+}
+#exam-form .exam-question .choice-option .result-mark-cross {
+  color: var(--danger);
+}
+
+/* --------------------------------------------------------------------------
+ * Focus: hide mouse/touch click ring; keep a clear keyboard :focus-visible ring.
+ * Sources found: styles.css input:focus / select:focus box-shadow, browser
+ * default outline on buttons, and -webkit-tap-highlight on touch.
+ * -------------------------------------------------------------------------- */
+button,
+.button,
+.theme-toggle,
+.check-option,
+.choice-option,
+.mode-item,
+.dropzone,
+.file-item,
+label.check-option,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Mouse / touch: no extra ring (selected/hover styles stay intact) */
+button:focus:not(:focus-visible),
+.button:focus:not(:focus-visible),
+.theme-toggle:focus:not(:focus-visible),
+.check-option:focus:not(:focus-visible),
+.choice-option:focus:not(:focus-visible),
+.mode-item:focus:not(:focus-visible),
+.dropzone:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+label:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Keyboard: visible AA focus ring */
+button:focus-visible,
+.button:focus-visible,
+.theme-toggle:focus-visible,
+.check-option:focus-visible,
+.choice-option:focus-visible,
+.mode-item:focus-visible,
+.dropzone:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+label:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--primary, #4f46e5);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/* Checkbox/radio inside chips: no square focus box on click */
+.check-option input:focus:not(:focus-visible),
+.choice-option input:focus:not(:focus-visible),
+label input[type="checkbox"]:focus:not(:focus-visible),
+label input[type="radio"]:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+.check-option input:focus-visible,
+.choice-option input:focus-visible,
+label input[type="checkbox"]:focus-visible,
+label input[type="radio"]:focus-visible {
+  outline: 2px solid var(--primary, #4f46e5);
+  outline-offset: 2px;
+}
+
 @media print {
   .review-status,
   .choice-option .result-mark,
@@ -281,5 +372,8 @@
   .exam-explanation {
     margin-top: 12px;
     border: 1px solid #999;
+  }
+  #exam-form .exam-question .choice-option {
+    grid-template-columns: 18px 28px minmax(0, 1fr) 28px;
   }
 }
