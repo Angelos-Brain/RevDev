@@ -1,4 +1,4 @@
-/* RevDev cloud bootstrap v5 — Gemini/Groq + flexible exam counts */
+/* RevDev cloud bootstrap v6 — Gemini/Groq + flexible exam counts + submit fix */
 (function () {
   const originalFetch = window.fetch.bind(window);
   const GEMINI_FREE_MODEL = "gemini-3.5-flash-lite";
@@ -191,7 +191,7 @@ function patchExamConfig(source) {
       "    short_answer: (window.__revdevDistributeTypes((window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).count||20, (window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).types||[\"short_answer\"]).short_answer)"
   );
 
-  // HARD disable exact-20 validation — condition becomes always false
+  // Disable exact-20 generation validation
   source = source.replace(/counts\.multiple_choice !== 10/g, "false");
   source = source.replace(/counts\.true_false !== 5/g, "false");
   source = source.replace(/counts\.identification !== 3/g, "false");
@@ -200,6 +200,12 @@ function patchExamConfig(source) {
   source = source.replace(
     /The AI generated fewer than 20 unique source-backed exam questions\. Try generating again or use a smaller topic focus\./g,
     "The AI could not generate enough unique source-backed exam questions from the file. Try again, lower the item count, or use a broader topic focus."
+  );
+
+  // FIX SUBMIT: was "state.exam.length !== 20" which blocked scoring for any other count
+  source = source.replace(
+    "if (state.exam.length !== 20 || state.examSubmitted) return;",
+    "if (state.exam.length < 1 || state.examSubmitted) return;"
   );
 
   // Prompt / status copy
@@ -223,15 +229,15 @@ const CDN_APP =
 async function revdevLoadApp() {
   ensureCloudAiUi();
   wireItemCountControls();
-  const response = await fetch(CDN_APP + "?v=examfix5");
+  const response = await fetch(CDN_APP + "?v=examfix6");
   if (!response.ok) throw new Error("Could not load RevDev application module.");
   let source = await response.text();
   source = patchExamConfig(source);
 
-  if (source.indexOf("counts.multiple_choice !== 10") !== -1) {
-    console.error("RevDev: failed to neutralize 20-question check");
+  if (source.indexOf("state.exam.length !== 20") !== -1) {
+    console.error("RevDev: failed to patch submitExam length check");
   } else {
-    console.info("RevDev: exam count validation patched (v5)");
+    console.info("RevDev: exam submit + count validation patched (v6)");
   }
 
   const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
