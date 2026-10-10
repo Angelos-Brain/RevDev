@@ -84,35 +84,28 @@ async function inflateBase64Gzip(b64) {
 }
 
 const QUALITY_RULES = [
-  "QUALITY RULES (mandatory — follow every rule):",
-  "GOAL: Write HARD, concept-focused exam questions that test deep understanding of the subject.",
+  "ROLE: You are a university exam writer for a hard, high-stakes exam on the SUBJECT in the text.",
   "",
-  "BANNED phrasing — never use these in question stems or options:",
-  "- according to the course files / according to the file(s) / according to the material / according to the study guide",
-  "- study guide, course file, document, handout, chapter, section, appendix, preface, table of contents",
-  "- supplemental materials, exam preparation resources, provided at the end of the guide",
-  "- how many pages, which chapter covers, on which page, prepared for, publication date",
+  "CONTENT RULES (MUST):",
+  "- Test the subject itself: concepts, mechanisms, definitions, rules, formulas, processes, trade-offs, causes and effects.",
+  "- Every question MUST stand alone as if from a real exam. A student who never saw the file must understand it.",
+  "- NEVER mention or imply the source. Forbidden in questions, options, and explanations: \"according to\", \"the text\", \"the passage\", \"the document\", \"the file(s)\", \"the course files\", \"the material(s)\", \"the study guide\", \"the guide\", \"the author\", \"the slides\", \"uploaded\", \"provided\", \"chapter\", \"section\", \"appendix\", \"table of contents\", \"page\", \"glossary\", \"review questions\".",
+  "- Ignore front/back matter: table of contents, preface, how-to-use notes, chapter structure, citations, reference lists, bibliography, appendices, glossary listings, review-question sections, headers, footers, page numbers.",
+  "- Never ask about layout, order of sections, who wrote it, or what the document contains. Ask what the subject IS and HOW it works.",
   "",
-  "BANNED question types:",
-  "- Document structure or navigation (TOC, chapters, page counts, appendices)",
-  "- Meta questions about the guide itself or how the course is organized",
-  "- Trivial recall of headings, titles, or what is listed at the end",
-  "- Soft/easy dictionary-style one-word definition dumps when deeper reasoning is possible",
+  "DIFFICULTY RULES (MUST):",
+  "- At least 70% of questions require application, analysis, or evaluation: realistic scenarios, \"which approach is BEST and why\", compare/contrast of similar concepts, cause and effect, edge cases, troubleshooting, multi-step reasoning, calculations when the content supports them.",
+  "- The remaining questions may test precise, important recall (exact definitions, key distinctions, thresholds), never trivial or obvious facts.",
+  "- Cover different topics across the batch. No repeated or near-duplicate questions.",
   "",
-  "REQUIRED difficulty (HARD):",
-  "- Prefer application, analysis, comparison, cause-effect, what happens if, multi-step reasoning",
-  "- Require understanding of relationships between concepts, not just naming a term",
-  "- Wrong options must be close, technical, and tempting (common misconceptions)",
-  "- Avoid questions a student could answer without studying the real content",
+  "PER QUESTION TYPE:",
+  "- Multiple choice: 4 options, one best answer. Wrong options MUST be plausible: real concepts from the same domain, common misconceptions, or near-misses. Similar length and wording across options. No absurd or off-topic options. No \"all of the above\" or \"none of the above\".",
+  "- True/False: a precise statement that is only wrong or right because of a meaningful detail. No obvious giveaway words (always, never) used alone.",
+  "- Identification: describe the concept by its characteristics without naming it. One unambiguous answer.",
+  "- Short answer: requires 1 to 3 sentences of reasoning. Include the key points a correct answer must contain.",
+  "- Explanations: say why the answer is right and why the strongest wrong option is wrong. Do not mention the source.",
   "",
-  "GOOD stems (examples of style, not content to copy):",
-  "- What is the primary reason X is used instead of Y?",
-  "- If condition A fails, which outcome is most likely?",
-  "- Which statement best distinguishes X from Y?",
-  "- Why does process Z require step N before step M?",
-  "",
-  "Write questions as a real subject exam. Never mention files, guides, or materials in the stem.",
-  "Each explanation must teach the underlying concept in 1-2 sentences."
+  "QUALITY CHECK: return only questions that pass every rule above. Replace any question that fails before returning."
 ].join("\n");
 
 const CDN = "https://cdn.jsdelivr.net/gh/Angelos-Brain/RevDev@3e34207/docs/";
@@ -137,14 +130,50 @@ await import(url);
       p = QUALITY_RULES + "\n\n" + p;
     }
     const sys = String(systemText || "") +
-      " Write HARD subject-matter exam questions only. Never mention study guides, files, materials, chapters, pages, or document structure. Test concepts, reasoning, and application.";
+      " You are a university exam writer for a hard, high-stakes exam on the SUBJECT. " +
+      "Never mention study guides, files, materials, chapters, sections, pages, appendices, glossaries, or document structure. " +
+      "Test concepts, mechanisms, reasoning, and application. Wrong options must be plausible domain near-misses.";
     return original.call(this, p, schema, sys, preferredProvider, onStatus);
   };
   console.info("RevDev: quality prompt filter armed");
 })();
 
+// Case-insensitive blocklist — reject any generated item that still mentions the source/file structure.
+const SOURCE_REFERENCE_BLOCKLIST = [
+  "according to",
+  "the text",
+  "the passage",
+  "the document",
+  "the file",
+  "files",
+  "course file",
+  "the material",
+  "materials",
+  "study guide",
+  "the guide",
+  "the author",
+  "the slides",
+  "uploaded",
+  "provided",
+  "chapter",
+  "appendix",
+  "table of contents",
+  "glossary",
+  "review questions",
+  "page number",
+  "source file",
+  "the source",
+  "handout",
+  "preface",
+  "supplemental"
+];
+
 function isMetaQuestion(q) {
-  return /according to the (course )?file|according to the material|according to the study guide|study guide|course file|supplemental material|exam preparation|end of the guide|how many (total )?pages|which chapter covers|table of contents|prepared for|publication date|page markers|how many chapters|document states|file name|in the (preface|appendix)|provided at the end|handout|course material/i.test(q);
+  const lower = String(q || "").toLowerCase();
+  if (SOURCE_REFERENCE_BLOCKLIST.some(function (phrase) {
+    return lower.includes(phrase.toLowerCase());
+  })) return true;
+  return /how many (total )?pages|which chapter covers|page markers|how many chapters|document states|file name|in the (preface|appendix)|provided at the end|exam preparation resources|end of the guide|publication date/i.test(q);
 }
 
 (function installFullCountFill() {
@@ -229,9 +258,9 @@ function isMetaQuestion(q) {
             : { multiple_choice: need };
           prompt = [
             QUALITY_RULES,
-            "Create EXACTLY " + need + " HARD concept-focused exam questions from ONLY this source text.",
+            "Create EXACTLY " + need + " HARD university-exam questions from ONLY the subject knowledge in this source text.",
             "You MUST return exactly " + need + " questions. Do not return fewer.",
-            "Never mention study guides, files, materials, chapters, or pages in the stems.",
+            "Never mention study guides, files, materials, chapters, sections, pages, or document structure in stems, options, or explanations.",
             "QUOTA: " + JSON.stringify(dist),
             "Types: multiple_choice, true_false, identification, short_answer.",
             avoidList.length ? "Do NOT repeat: " + JSON.stringify(avoidList) : "",
