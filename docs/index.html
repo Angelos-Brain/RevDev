@@ -18,7 +18,7 @@
           <small>Study smarter from your files.</small>
         </span>
       </a>
-      <span class="status-pill">Milestone 3 · Full study modes</span>
+      <span class="status-pill">Local AI · 1–100 items · WebGPU</span>
     </div>
   </header>
 
@@ -28,8 +28,8 @@
         <span class="eyebrow">FREE · BROWSER-FIRST</span>
         <h1>Turn your study files into a review workspace.</h1>
         <p class="hero-copy">
-          Upload your files, keep the source text in your browser, then use your own free Gemini or Groq key
-          to generate study material from that content.
+          Upload your files, keep the source text in your browser, then generate study material with free
+          in-browser AI models — no API key required.
         </p>
       </div>
     </section>
@@ -38,7 +38,7 @@
       <span class="privacy-icon" aria-hidden="true">✓</span>
       <div>
         <strong>Privacy by design</strong>
-        <p>Files are read in your browser. Only extracted text is sent to the AI provider you choose. Your API key is stored only in this browser.</p>
+        <p>Files are read in your browser. Files and generation stay in this browser. Models download into your browser cache; no API key is required.</p>
       </div>
     </section>
 
@@ -107,45 +107,44 @@
     <section class="card ai-card">
       <div class="card-heading">
         <div>
-          <span class="section-kicker">2 · CONNECT FREE AI</span>
-          <h2>Choose a provider</h2>
+          <span class="section-kicker">2 · LOCAL AI MODEL</span>
+          <h2>Choose an in-browser model</h2>
         </div>
-        <span class="mini-note">No backend server</span>
+        <span class="mini-note">No API key · WebGPU</span>
       </div>
 
-      <div class="settings-grid">
+      <p class="model-intro">
+        Models run on your device with WebGPU. First use downloads weights into this browser’s cache.
+        Nothing is sent to a remote API.
+      </p>
+
+      <div class="settings-grid model-settings">
         <label class="field">
-          <span class="field-label">AI provider</span>
-          <select id="provider-select">
-            <option value="gemini">Google Gemini (default)</option>
-            <option value="groq">Groq</option>
-          </select>
+          <span class="field-label">Model</span>
+          <select id="model-select"></select>
         </label>
-
-        <label class="field api-key-field">
-          <span class="field-label">API key</span>
-          <div class="api-key-row">
-            <input id="api-key" type="password" placeholder="Paste your free API key" autocomplete="off" spellcheck="false">
-            <button class="button secondary small-button" id="toggle-key" type="button">Show</button>
+        <div class="field model-status-field">
+          <span class="field-label">Status</span>
+          <div id="model-status" class="model-status">Checking WebGPU…</div>
+          <div id="model-progress" class="progress" hidden>
+            <div class="progress-track"><div class="progress-fill" id="model-progress-fill"></div></div>
           </div>
+        </div>
+      </div>
+
+      <div class="model-meta" id="model-meta"></div>
+
+      <div class="fallback-row">
+        <label class="check-option">
+          <input type="checkbox" id="auto-fallback" checked>
+          <span>Auto-switch to another model if this one fails</span>
         </label>
-      </div>
-
-      <div id="gemini-help" class="provider-help">
-        <strong>Gemini</strong>
-        <p>Get a free Gemini API key in Google AI Studio. RevDev uses <code>gemini-3.5-flash-lite</code>. If you see a limit error, wait a few minutes or switch to Groq.</p>
-        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Open Google AI Studio</a>
-      </div>
-
-      <div id="groq-help" class="provider-help" hidden>
-        <strong>Groq</strong>
-        <p>Get a free Groq API key. RevDev uses <code>openai/gpt-oss-120b</code> with structured JSON output. Useful if Gemini free-tier limits are hit.</p>
-        <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Open Groq Console</a>
+        <button class="button secondary small-button" id="load-model-button" type="button">Load model</button>
       </div>
 
       <p class="storage-note">
         <span class="dot"></span>
-        The key is saved only in this browser's localStorage. It is sent only to the provider you select.
+        Downloaded models stay in this browser. You can pick a smaller model if download or memory fails.
       </p>
     </section>
 
@@ -182,42 +181,45 @@
         </label>
       </div>
 
+      <div id="count-options" class="exam-options">
+        <div class="exam-options-heading">
+          <span class="field-label">How many items</span>
+          <span class="mini-note" id="count-hint">1–100 (default 20)</span>
+        </div>
+        <div class="count-slider-row">
+          <input id="item-count-slider" type="range" min="1" max="100" value="20" step="1">
+          <input id="item-count" type="number" min="1" max="100" value="20" step="1" inputmode="numeric">
+        </div>
+        <p class="field-hint" id="count-mode-hint">Applies to exam questions, flashcards, or summary topics depending on the study mode.</p>
+      </div>
+
       <div id="exam-options" class="exam-options">
         <div class="exam-options-heading">
-          <span class="field-label">Mock exam options</span>
-          <span class="mini-note">Choose types and how many items</span>
+          <span class="field-label">Mock exam question types</span>
+          <span class="mini-note">Only for Mock Exam</span>
         </div>
-
-        <div class="exam-options-grid">
-          <label class="field exam-count-field">
-            <span class="field-label">Number of items</span>
-            <input id="exam-item-count" type="number" min="1" max="50" value="20" step="1" inputmode="numeric">
-            <span class="field-hint">1–50 questions (default 20)</span>
-          </label>
-
-          <fieldset class="exam-type-fieldset">
-            <legend class="field-label">Question types</legend>
-            <div class="exam-type-list">
-              <label class="check-option">
-                <input type="checkbox" name="exam-type" value="multiple_choice" checked>
-                <span>Multiple choice</span>
-              </label>
-              <label class="check-option">
-                <input type="checkbox" name="exam-type" value="true_false" checked>
-                <span>True / False</span>
-              </label>
-              <label class="check-option">
-                <input type="checkbox" name="exam-type" value="identification" checked>
-                <span>Identification</span>
-              </label>
-              <label class="check-option">
-                <input type="checkbox" name="exam-type" value="short_answer" checked>
-                <span>Short answer</span>
-              </label>
-            </div>
-            <span class="field-hint">Selected types share the item count as evenly as possible.</span>
-          </fieldset>
-        </div>
+        <fieldset class="exam-type-fieldset">
+          <legend class="field-label">Question types</legend>
+          <div class="exam-type-list">
+            <label class="check-option">
+              <input type="checkbox" name="exam-type" value="multiple_choice" checked>
+              <span>Multiple choice</span>
+            </label>
+            <label class="check-option">
+              <input type="checkbox" name="exam-type" value="true_false" checked>
+              <span>True / False</span>
+            </label>
+            <label class="check-option">
+              <input type="checkbox" name="exam-type" value="identification" checked>
+              <span>Identification</span>
+            </label>
+            <label class="check-option">
+              <input type="checkbox" name="exam-type" value="short_answer" checked>
+              <span>Short answer</span>
+            </label>
+          </div>
+          <span class="field-hint">Selected types share the item count as evenly as possible.</span>
+        </fieldset>
       </div>
 
       <div class="action-row">
