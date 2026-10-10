@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="RevDev turns your study files into exam-ready review material.">
   <title>RevDev — Study File Reader</title>
-  <link rel="stylesheet" href="styles.css?v=align2">
+  <link rel="stylesheet" href="styles.css?v=ui1">
+  <script>
+    (function(){try{var t=localStorage.getItem("revdev_theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();
+  </script>
   <link rel="stylesheet" href="exam-options.css?v=dual1">
   <link rel="stylesheet" href="exam-feedback.css?v=10">
 </head>
@@ -19,7 +22,13 @@
           <small>Study smarter from your files.</small>
         </span>
       </a>
-      <span class="status-pill">Free AI · Gemini + Groq failover</span>
+      <div class="header-actions">
+        <span class="status-pill">Free AI · Gemini + Groq failover</span>
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle light or dark theme" title="Toggle theme">
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z"/></svg>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -33,6 +42,22 @@
         </p>
       </div>
     </section>
+
+    
+    <nav class="stepper" aria-label="Study setup steps">
+      <div class="stepper-item is-active" data-step="1">
+        <span class="stepper-num">1</span>
+        <span>Add files</span>
+      </div>
+      <div class="stepper-item" data-step="2">
+        <span class="stepper-num">2</span>
+        <span>Connect AI</span>
+      </div>
+      <div class="stepper-item" data-step="3">
+        <span class="stepper-num">3</span>
+        <span>Generate</span>
+      </div>
+    </nav>
 
     <section class="privacy-note" aria-label="Privacy note">
       <span class="privacy-icon" aria-hidden="true">✓</span>
@@ -358,6 +383,22 @@
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.2/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mammoth@1.13.0/mammoth.browser.min.js"></script>
-  <script type="module" src="./app.js?v=hard1"></script>
+  <script type="module" src="./app.js?v=ui1"></script>
+
+  <script>
+  (function(){
+    var btn = document.getElementById("theme-toggle");
+    if (!btn) return;
+    btn.addEventListener("click", function(){
+      var cur = document.documentElement.getAttribute("data-theme");
+      var next;
+      if (cur === "dark") next = "light";
+      else if (cur === "light") next = "dark";
+      else next = window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem("revdev_theme", next); } catch(e) {}
+    });
+  })();
+  </script>
 </body>
 </html>
