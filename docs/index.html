@@ -6,7 +6,7 @@
   <meta name="description" content="RevDev turns your study files into exam-ready review material.">
   <title>RevDev — Study File Reader</title>
   <link rel="stylesheet" href="styles.css?v=ui15">
-  <link rel="stylesheet" href="ui-fixes.css?v=4">
+  <link rel="stylesheet" href="ui-fixes.css?v=5">
   <script>
     (function(){try{var t=localStorage.getItem("revdev_theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();
   </script>
@@ -44,7 +44,6 @@
       </div>
     </section>
 
-    
     <nav class="stepper" aria-label="Study setup steps">
       <div class="stepper-item is-active" data-step="1">
         <span class="stepper-num">1</span>
@@ -95,7 +94,6 @@
           </div>
         </div>
       </aside>
-
 
     <section class="workspace">
       <div class="card upload-card">
@@ -385,7 +383,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.2/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mammoth@1.13.0/mammoth.browser.min.js"></script>
-  <script type="module" src="./app.js?v=ui11"></script>
+  <script type="module" src="./app.js?v=ui12"></script>
 
   <script>
   (function(){
@@ -403,15 +401,12 @@
   })();
   </script>
 
-
   <script>
   (function () {
     function qs(id) { return document.getElementById(id); }
-
     function updateStepper() {
       var items = document.querySelectorAll(".stepper-item");
       if (!items.length) return;
-
       var statusText = (qs("status") && qs("status").textContent || "").toLowerCase();
       var fileList = qs("file-list");
       var fileHtml = fileList ? fileList.innerHTML.toLowerCase() : "";
@@ -419,9 +414,6 @@
         /readable|finished|produced readable/.test(statusText) ||
         /readable/.test(fileHtml) ||
         (fileList && fileList.querySelector(".file-state.ready, .file-state"));
-
-      var hasFileItems = fileList && fileList.querySelectorAll(".file-item").length > 0;
-
       var keysStatus = qs("keys-status");
       var keysText = (keysStatus && keysStatus.textContent || "").toLowerCase();
       var g = qs("api-key-gemini");
@@ -429,7 +421,6 @@
       var hasKeys =
         ((g && g.value.trim().length > 8) || (q && q.value.trim().length > 8)) ||
         (/saved|gemini|groq/.test(keysText) && !/no keys/.test(keysText));
-
       var genStatus = qs("generation-status");
       var genText = (genStatus && genStatus.textContent || "").toLowerCase();
       var hasOutput =
@@ -437,7 +428,6 @@
         (qs("exam-output") && !qs("exam-output").hidden) ||
         (qs("flashcards-output") && !qs("flashcards-output").hidden) ||
         (qs("summary-output") && !qs("summary-output").hidden);
-
       items.forEach(function (el) {
         el.classList.remove("is-active", "is-done");
         var step = el.getAttribute("data-step");
@@ -453,7 +443,6 @@
         }
       });
     }
-
     function bind() {
       ["status", "file-list", "keys-status", "generation-status"].forEach(function (id) {
         var el = qs(id);
