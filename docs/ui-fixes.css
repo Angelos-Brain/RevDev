@@ -1,4 +1,4 @@
-/* RevDev UI fixes: progress bar + mock exam question headers + focus + marks */
+/* RevDev UI fixes: progress, exam cards, focus, marks, mobile overflow */
 
 /* Progress track needs explicit height so the fill is visible */
 .progress {
@@ -121,12 +121,15 @@
   padding: 0;
   line-height: 1.45;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .exam-question .question-options,
 .exam-question .answer-input {
   margin-top: 14px;
   clear: both;
+  min-width: 0;
+  max-width: 100%;
 }
 
 @media print {
@@ -191,6 +194,10 @@
   font-size: 0.88rem;
   color: var(--text-secondary);
   line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .exam-inline-result .exp-label,
 .exam-explanation .exp-label {
@@ -213,6 +220,7 @@
   font-size: 0.75rem;
   font-weight: 700;
   width: fit-content;
+  max-width: 100%;
   clear: both;
 }
 .review-status.is-correct {
@@ -244,6 +252,8 @@
   margin-top: 12px;
   font-size: 0.88rem;
   line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .review-correct-answer {
   color: var(--success);
@@ -255,21 +265,21 @@
   font-weight: 600;
 }
 
-/* --------------------------------------------------------------------------
- * Option row: 4 columns (radio | letter | text | mark) so the check/X never
- * wraps under the radio. Higher specificity beats exam-feedback.css 3-col grid.
- * Reserve the mark column in taking mode too to avoid layout shift on review.
- * -------------------------------------------------------------------------- */
+/* Option row: 4 columns so check/X stay in the last column */
 #exam-form .exam-question .choice-option {
   display: grid;
   grid-template-columns: 18px 28px minmax(0, 1fr) 28px;
   column-gap: 10px;
   align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 #exam-form .exam-question .choice-option > span:nth-child(3) {
   min-width: 0;
   line-height: 1.35;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 #exam-form .exam-question .choice-option .result-mark {
   grid-column: 4;
@@ -291,11 +301,7 @@
   color: var(--danger);
 }
 
-/* --------------------------------------------------------------------------
- * Focus: hide mouse/touch click ring; keep a clear keyboard :focus-visible ring.
- * Sources found: styles.css input:focus / select:focus box-shadow, browser
- * default outline on buttons, and -webkit-tap-highlight on touch.
- * -------------------------------------------------------------------------- */
+/* Focus: hide mouse/touch ring; keep keyboard :focus-visible */
 button,
 .button,
 .theme-toggle,
@@ -309,7 +315,6 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Mouse / touch: no extra ring (selected/hover styles stay intact) */
 button:focus:not(:focus-visible),
 .button:focus:not(:focus-visible),
 .theme-toggle:focus:not(:focus-visible),
@@ -326,7 +331,6 @@ a:focus:not(:focus-visible) {
   box-shadow: none;
 }
 
-/* Keyboard: visible AA focus ring */
 button:focus-visible,
 .button:focus-visible,
 .theme-toggle:focus-visible,
@@ -344,7 +348,6 @@ a:focus-visible {
   box-shadow: none;
 }
 
-/* Checkbox/radio inside chips: no square focus box on click */
 .check-option input:focus:not(:focus-visible),
 .choice-option input:focus:not(:focus-visible),
 label input[type="checkbox"]:focus:not(:focus-visible),
@@ -358,6 +361,146 @@ label input[type="checkbox"]:focus-visible,
 label input[type="radio"]:focus-visible {
   outline: 2px solid var(--primary, #4f46e5);
   outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+ * Mobile overflow: long unbreakable filenames must not widen the page.
+ * Flex/grid children default to min-width: auto; a nowrap name then expands
+ * the card past the viewport. Shrink containers and allow names to wrap.
+ * -------------------------------------------------------------------------- */
+html {
+  overflow-x: clip;
+  max-width: 100%;
+}
+body {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+.shell,
+.page,
+.workspace,
+.card,
+.upload-card,
+.ai-card,
+.generate-card,
+.preview-card,
+.output-card,
+.next-card {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.dropzone,
+.file-list-wrap,
+.file-list,
+.file-item,
+.file-main,
+.list-heading,
+.action-row,
+.status-message,
+.api-key-row,
+.field,
+.generator-grid,
+.settings-grid,
+.dual-key-grid {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.dropzone {
+  width: 100%;
+}
+
+/* File names: wrap long unbroken strings instead of forcing horizontal scroll */
+.file-name {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.file-item {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.file-main {
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+}
+
+.file-state {
+  flex-shrink: 0;
+}
+
+/* Read files + Clear share the row equally on phones */
+.action-row {
+  width: 100%;
+}
+.action-row .button {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+@media (max-width: 340px) {
+  .action-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .action-row .button {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+}
+
+/* Preview and long status text: scroll inside the box, never widen the page */
+.preview,
+#preview {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  box-sizing: border-box;
+}
+
+.status-message,
+#status,
+#generation-status,
+#keys-status {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+input[type="password"],
+input[type="text"],
+input[type="number"],
+select,
+textarea {
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Exam / summary long text stays inside cards */
+.exam-intro,
+.answer-input,
+#summary-content,
+.flashcard-face,
+.mode-item {
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  box-sizing: border-box;
 }
 
 @media print {
