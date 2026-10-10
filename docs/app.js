@@ -1,4 +1,4 @@
-/* RevDev cloud bootstrap v9 — green/red choices + explanation only */
+/* RevDev cloud bootstrap v10 — green/red choices + explanation only */
 (function () {
   const originalFetch = window.fetch.bind(window);
   const GEMINI_FREE_MODEL = "gemini-3.5-flash-lite";
@@ -67,7 +67,7 @@ function ensureCloudAiUi() {
   if (!document.querySelector('link[href*="exam-feedback.css"]')) {
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "exam-feedback.css?v=9";
+    link.href = "exam-feedback.css?v=10";
     document.head.appendChild(link);
   }
   const aiCard = document.querySelector(".ai-card");
@@ -248,7 +248,6 @@ window.__revdevMarkExamForm = function (outcomes) {
       }
     }
 
-    // If wrong, also outline the correct option(s)
     if (!outcome.correct && outcome.question && outcome.question.answers) {
       const accepted = outcome.question.answers.map(function (a) {
         return String(a).trim().toLowerCase();
@@ -261,7 +260,6 @@ window.__revdevMarkExamForm = function (outcomes) {
       });
     }
 
-    // Bottom of card: explanation only (choices already show right/wrong)
     let box = fieldset.querySelector(".exam-inline-result");
     const expl =
       outcome.question && outcome.question.explanation
@@ -303,7 +301,7 @@ const CDN_APP =
 async function revdevLoadApp() {
   ensureCloudAiUi();
   wireItemCountControls();
-  const response = await fetch(CDN_APP + "?v=examfix9");
+  const response = await fetch(CDN_APP + "?v=examfix10");
   if (!response.ok) throw new Error("Could not load RevDev application module.");
   let source = await response.text();
   source = patchExamConfig(source);
@@ -311,7 +309,7 @@ async function revdevLoadApp() {
   if (/state\.exam\.length !== 20/.test(source)) {
     console.error("RevDev: length!==20 still present after patch");
   } else {
-    console.info("RevDev: inline exam feedback ready (v9)");
+    console.info("RevDev: inline exam feedback ready (v10)");
   }
 
   const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
