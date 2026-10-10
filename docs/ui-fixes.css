@@ -1,0 +1,122 @@
+/* RevDev UI fixes: progress bar + mock exam question headers */
+
+/* Progress track needs explicit height so the fill is visible */
+.progress {
+  height: 8px;
+}
+.progress-track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 6px;
+  border-radius: inherit;
+  overflow: hidden;
+}
+#progress-fill,
+.progress-fill {
+  height: 100%;
+  min-height: 6px;
+}
+.progress-fill.is-success {
+  background: linear-gradient(90deg, var(--success), #34d399);
+}
+.progress-fill.is-warning {
+  background: linear-gradient(90deg, var(--warning), #fbbf24);
+}
+.progress-fill.is-error {
+  background: linear-gradient(90deg, var(--danger), #f87171);
+}
+.progress-fill.is-indeterminate {
+  background-size: 200% 100%;
+  animation: revdev-progress-shimmer 1.2s linear infinite;
+}
+@keyframes revdev-progress-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress-fill.is-indeterminate { animation: none; }
+}
+
+/* Mock exam: legend must not straddle the card border; number + type chip + text */
+.exam-question {
+  margin: 0;
+  min-width: 0;
+}
+.exam-question > legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 0 10px;
+  padding: 0;
+  float: none;
+  position: static;
+  border: 0;
+  box-sizing: border-box;
+}
+.exam-question .question-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  height: 1.75rem;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+.exam-question .question-type {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 4px 10px;
+  border-radius: var(--radius-full, 999px);
+  background: var(--primary-soft);
+  color: var(--primary-text);
+  text-transform: none;
+  flex-shrink: 0;
+}
+.exam-question .question-text {
+  display: block;
+  width: 100%;
+  flex: 1 0 100%;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+@media print {
+  .exam-question > legend {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .exam-question .question-text {
+    display: block !important;
+    flex: 1 0 100%;
+  }
+  .exam-question .question-number {
+    background: #333 !important;
+    color: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .exam-question .question-type {
+    border: 1px solid #999;
+    background: #eee !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

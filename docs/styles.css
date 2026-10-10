@@ -1,1 +1,2 @@
-/* Restored - see ui-fixes.css for progress and exam header fixes */
+/* RevDev styles: load pre-backup stylesheet; UI fixes live in ui-fixes.css */
+@import url("https://cdn.jsdelivr.net/gh/Angelos-Brain/RevDev@backup-before-grok-2026-10-10/docs/styles.css");
