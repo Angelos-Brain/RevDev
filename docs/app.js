@@ -1,4 +1,4 @@
-/* RevDev cloud bootstrap v6 — Gemini/Groq + flexible exam counts + submit fix */
+/* RevDev cloud bootstrap v7 — Gemini/Groq + flexible exams + working submit */
 (function () {
   const originalFetch = window.fetch.bind(window);
   const GEMINI_FREE_MODEL = "gemini-3.5-flash-lite";
@@ -89,11 +89,6 @@ function ensureCloudAiUi() {
   }
   const pill = document.querySelector(".status-pill");
   if (pill) pill.textContent = "Free AI · Gemini / Groq";
-  const hero = document.querySelector(".hero-copy");
-  if (hero) {
-    hero.textContent =
-      "Upload your files, keep the source text in your browser, then use your own free Gemini or Groq key to generate study material.";
-  }
 }
 
 window.__revdevGetExamSettings = function () {
@@ -167,7 +162,6 @@ function wireItemCountControls() {
 }
 
 function patchExamConfig(source) {
-  // Dynamic quota from UI
   source = source.replace(
     /function getExamQuota\(chunkIndex, totalChunks\) \{[\s\S]*?\n\}\n\nfunction buildPrompt/,
     "function getExamQuota(chunkIndex, totalChunks) {\n" +
@@ -182,7 +176,6 @@ function patchExamConfig(source) {
       "}\n\nfunction buildPrompt"
   );
 
-  // Dynamic targetCounts values
   source = source.replace(
     "multiple_choice: 10,\n    true_false: 5,\n    identification: 3,\n    short_answer: 2",
     "multiple_choice: (window.__revdevDistributeTypes((window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).count||20, (window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).types||[\"multiple_choice\"]).multiple_choice),\n" +
@@ -191,7 +184,6 @@ function patchExamConfig(source) {
       "    short_answer: (window.__revdevDistributeTypes((window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).count||20, (window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).types||[\"short_answer\"]).short_answer)"
   );
 
-  // Disable exact-20 generation validation
   source = source.replace(/counts\.multiple_choice !== 10/g, "false");
   source = source.replace(/counts\.true_false !== 5/g, "false");
   source = source.replace(/counts\.identification !== 3/g, "false");
@@ -202,13 +194,12 @@ function patchExamConfig(source) {
     "The AI could not generate enough unique source-backed exam questions from the file. Try again, lower the item count, or use a broader topic focus."
   );
 
-  // FIX SUBMIT: was "state.exam.length !== 20" which blocked scoring for any other count
+  // Critical: unlock submit + retake for any exam length
   source = source.replace(
-    "if (state.exam.length !== 20 || state.examSubmitted) return;",
-    "if (state.exam.length < 1 || state.examSubmitted) return;"
+    /state\.exam\.length !== 20/g,
+    "state.exam.length < 1"
   );
 
-  // Prompt / status copy
   source = source.replace(/a 20-item mock exam/g, "a mock exam");
   source = source.replace(
     /exactly 10 multiple_choice, 5 true_false, 3 identification, and 2 short_answer questions/g,
@@ -223,26 +214,102 @@ function patchExamConfig(source) {
   return source;
 }
 
+/** Fallback submit if the app module still fails to score. */
+function installSubmitFallback() {
+  const btn = document.getElementById("submit-exam");
+  const form = document.getElementById("exam-form");
+  const results = document.getElementById("exam-results");
+  const scoreEl = document.getElementById("exam-score");
+  const percentEl = document.getElementById("exam-percent");
+  const reviewEl = document.getElementById("answer-review");
+  const retakeBtn = document.getElementById("retake-exam");
+  if (!btn || !form) return;
+
+  btn.addEventListener(
+    "click",
+    function (event) {
+      // If results already visible, app handled it.
+      if (results && !results.hidden) return;
+
+      // Delay slightly so the app's own handler runs first.
+      setTimeout(function () {
+        if (results && !results.hidden) return;
+
+        const questions = form.querySelectorAll(".exam-question");
+        if (!questions.length) return;
+
+        let score = 0;
+        const total = questions.length;
+        const lines = [];
+
+        questions.forEach(function (q, index) {
+          const name = "question-" + index;
+          const selected = form.querySelector('input[name="' + name + '"]:checked');
+          const textInput = form.querySelector('input[type="text"][name="' + name + '"], textarea[name="' + name + '"]');
+          const userVal = selected
+            ? selected.value
+            : textInput
+              ? textInput.value.trim()
+              : "";
+          const answered = userVal.length > 0;
+          // Without answer keys in the DOM, mark answered vs blank only.
+          // Prefer app's internal scoring; this is last-resort feedback.
+          if (answered) score += 1;
+          lines.push(
+            (index + 1) +
+              ". " +
+              (answered ? "Answer recorded: " + userVal : "No answer")
+          );
+        });
+
+        // Only show fallback if still no results
+        if (results && results.hidden) {
+          console.warn("RevDev: using fallback submit UI (app scorer did not run)");
+          results.hidden = false;
+          if (scoreEl) scoreEl.textContent = score + " / " + total + " answered";
+          if (percentEl) {
+            percentEl.textContent =
+              Math.round((score / total) * 100) + "% answered";
+          }
+          if (reviewEl) {
+            reviewEl.innerHTML =
+              "<p><strong>Note:</strong> Full auto-grading did not attach. Your answers were recorded. " +
+              "Hard-refresh the page (Ctrl+Shift+R), regenerate the exam, and submit again for scored results.</p><ul>" +
+              lines.map(function (l) { return "<li>" + l + "</li>"; }).join("") +
+              "</ul>";
+          }
+          if (btn) btn.hidden = true;
+          if (retakeBtn) retakeBtn.hidden = false;
+          results.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 50);
+    },
+    true
+  );
+}
+
 const CDN_APP =
   "https://cdn.jsdelivr.net/gh/Angelos-Brain/RevDev@c151cf08a68250e6b1477b6f2c339246181b48f4/docs/app.js";
 
 async function revdevLoadApp() {
   ensureCloudAiUi();
   wireItemCountControls();
-  const response = await fetch(CDN_APP + "?v=examfix6");
+  const response = await fetch(CDN_APP + "?v=examfix7");
   if (!response.ok) throw new Error("Could not load RevDev application module.");
   let source = await response.text();
   source = patchExamConfig(source);
 
-  if (source.indexOf("state.exam.length !== 20") !== -1) {
-    console.error("RevDev: failed to patch submitExam length check");
+  const stillBlocked = /state\.exam\.length !== 20/.test(source);
+  if (stillBlocked) {
+    console.error("RevDev: length!==20 still present after patch");
   } else {
-    console.info("RevDev: exam submit + count validation patched (v6)");
+    console.info("RevDev: exam submit unlocked for any count (v7)");
   }
 
   const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
   await import(url);
   wireItemCountControls();
+  installSubmitFallback();
 }
 
 await revdevLoadApp();
