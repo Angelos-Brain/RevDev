@@ -233,23 +233,8 @@ h1 {
 .mini-note { color: var(--muted); font-size: 0.78rem; font-weight: 500; }
 
 .workspace { display: grid; gap: 16px; }
-/* Mobile: show study-modes guide above upload (still after Privacy in page flow) */
-@media (max-width: 899px) {
-  .workspace {
-    display: flex;
-    flex-direction: column;
-  }
-  .workspace .next-card {
-    display: block;
-    order: -1;
-  }
-  .workspace .upload-card {
-    order: 1;
-  }
-}
-
 @media (min-width: 900px) {
-  .workspace { grid-template-columns: 1.4fr 0.9fr; align-items: start; }
+  .workspace { grid-template-columns: 1fr; }
 }
 
 .dropzone {

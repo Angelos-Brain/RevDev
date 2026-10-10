@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="RevDev turns your study files into exam-ready review material.">
   <title>RevDev — Study File Reader</title>
-  <link rel="stylesheet" href="styles.css?v=ui11">
+  <link rel="stylesheet" href="styles.css?v=ui12">
   <script>
     (function(){try{var t=localStorage.getItem("revdev_theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();
   </script>
@@ -67,6 +67,35 @@
       </div>
     </section>
 
+    <aside class="card next-card">
+        <span class="section-kicker">STUDY MODES</span>
+        <h2>Study modes</h2>
+        <div class="mode-list">
+          <div class="mode-item active">
+            <span class="mode-number">01</span>
+            <div>
+              <strong>Mock Exam</strong>
+              <p>Custom item count (1–100) and question types with scoring and explanations.</p>
+            </div>
+          </div>
+          <div class="mode-item active">
+            <span class="mode-number">02</span>
+            <div>
+              <strong>Flashcards</strong>
+              <p>Generate, flip, and study cards from the uploaded text.</p>
+            </div>
+          </div>
+          <div class="mode-item active">
+            <span class="mode-number">03</span>
+            <div>
+              <strong>Summary Reviewer</strong>
+              <p>Topic sections with concepts, definitions, rules, mistakes, and self-checks.</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+
     <section class="workspace">
       <div class="card upload-card">
         <div class="card-heading">
@@ -99,35 +128,7 @@
 
         <div id="status" class="status-message" role="status" aria-live="polite"></div>
       </div>
-
-      <aside class="card next-card">
-        <span class="section-kicker">STUDY MODES</span>
-        <h2>Study modes</h2>
-        <div class="mode-list">
-          <div class="mode-item active">
-            <span class="mode-number">01</span>
-            <div>
-              <strong>Mock Exam</strong>
-              <p>Custom item count (1–100) and question types with scoring and explanations.</p>
-            </div>
-          </div>
-          <div class="mode-item active">
-            <span class="mode-number">02</span>
-            <div>
-              <strong>Flashcards</strong>
-              <p>Generate, flip, and study cards from the uploaded text.</p>
-            </div>
-          </div>
-          <div class="mode-item active">
-            <span class="mode-number">03</span>
-            <div>
-              <strong>Summary Reviewer</strong>
-              <p>Topic sections with concepts, definitions, rules, mistakes, and self-checks.</p>
-            </div>
-          </div>
-        </div>
-      </aside>
-    </section>
+</section>
 
     <section class="card ai-card">
       <div class="card-heading">
