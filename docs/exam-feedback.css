@@ -1,0 +1,60 @@
+/* Inline exam grading on the answer form */
+.exam-question.is-correct {
+  border-color: #1f9d63;
+  border-left: 5px solid #1f9d63;
+  background: #f0faf5;
+}
+.exam-question.is-incorrect {
+  border-color: #c44b4b;
+  border-left: 5px solid #c44b4b;
+  background: #fdf3f3;
+}
+.exam-question.is-correct .question-number {
+  background: #1f9d63;
+  color: #fff;
+}
+.exam-question.is-incorrect .question-number {
+  background: #c44b4b;
+  color: #fff;
+}
+.exam-inline-result {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.exam-question.is-correct .exam-inline-result {
+  background: #d8f3e5;
+  color: #145c3a;
+}
+.exam-question.is-incorrect .exam-inline-result {
+  background: #f8dede;
+  color: #7a2424;
+}
+.exam-inline-result strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.exam-question input:disabled,
+.exam-question textarea:disabled {
+  opacity: 0.85;
+  cursor: default;
+}
+.choice-option.is-user-correct {
+  outline: 2px solid #1f9d63;
+  border-radius: 10px;
+  background: #e6f7ee;
+}
+.choice-option.is-user-wrong {
+  outline: 2px solid #c44b4b;
+  border-radius: 10px;
+  background: #fdeaea;
+}
+.choice-option.is-right-answer {
+  outline: 2px solid #1f9d63;
+  border-radius: 10px;
+}
