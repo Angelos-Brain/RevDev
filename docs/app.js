@@ -1,4 +1,4 @@
-/* RevDev dual-key loader + legacy DOM stubs */
+/* RevDev dual-key loader + legacy DOM stubs + key visibility toggles */
 (function ensureLegacyElements() {
   const stubs = [
     { id: "toggle-key", tag: "button", type: "button" },
@@ -24,6 +24,72 @@
   document.body.appendChild(host);
 })();
 
+/* Always-on Show/Hide for API key fields (works even if payload wiring fails) */
+(function wireKeyVisibilityToggles() {
+  var pairs = [
+    { btn: "toggle-key-gemini", input: "api-key-gemini" },
+    { btn: "toggle-key-groq", input: "api-key-groq" },
+    { btn: "toggle-gemini-key", input: "gemini-key" },
+    { btn: "toggle-groq-key", input: "groq-key" },
+    { btn: "toggle-key", input: "api-key" }
+  ];
+
+  function bindOne(btnId, inputId) {
+    var btn = document.getElementById(btnId);
+    var input = document.getElementById(inputId);
+    if (!btn || !input || btn.dataset.revdevToggleBound === "1") return;
+    btn.dataset.revdevToggleBound = "1";
+    btn.type = "button";
+    btn.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      var show = input.type === "password";
+      input.type = show ? "text" : "password";
+      btn.textContent = show ? "Hide" : "Show";
+    });
+  }
+
+  function bindAll() {
+    pairs.forEach(function (p) {
+      bindOne(p.btn, p.input);
+    });
+  }
+
+  bindAll();
+  // Re-bind after async modules settle
+  setTimeout(bindAll, 0);
+  setTimeout(bindAll, 500);
+  setTimeout(bindAll, 1500);
+
+  // Event delegation fallback (handles late DOM swaps)
+  document.addEventListener(
+    "click",
+    function (event) {
+      var btn = event.target && event.target.closest
+        ? event.target.closest(
+            "#toggle-key-gemini, #toggle-key-groq, #toggle-gemini-key, #toggle-groq-key, #toggle-key"
+          )
+        : null;
+      if (!btn) return;
+      var map = {
+        "toggle-key-gemini": "api-key-gemini",
+        "toggle-key-groq": "api-key-groq",
+        "toggle-gemini-key": "gemini-key",
+        "toggle-groq-key": "groq-key",
+        "toggle-key": "api-key"
+      };
+      var input = document.getElementById(map[btn.id]);
+      if (!input) return;
+      event.preventDefault();
+      event.stopPropagation();
+      var show = input.type === "password";
+      input.type = show ? "text" : "password";
+      btn.textContent = show ? "Hide" : "Show";
+    },
+    true
+  );
+})();
+
 async function inflateBase64Gzip(b64) {
   const binary = atob(b64);
   const bytes = new Uint8Array(binary.length);
@@ -36,7 +102,7 @@ async function inflateBase64Gzip(b64) {
 
 const parts = [];
 for (let i = 0; i < 4; i++) {
-  const res = await fetch("./dual_c" + i + ".txt?v=1");
+  const res = await fetch("./dual_c" + i + ".txt?v=2");
   if (!res.ok) throw new Error("Missing dual_c" + i + ".txt");
   parts.push((await res.text()).replace(/\s+/g, ""));
 }
