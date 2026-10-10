@@ -1,4 +1,4 @@
-/* RevDev cloud bootstrap v4 — Gemini/Groq + flexible exam counts */
+/* RevDev cloud bootstrap v5 — Gemini/Groq + flexible exam counts */
 (function () {
   const originalFetch = window.fetch.bind(window);
   const GEMINI_FREE_MODEL = "gemini-3.5-flash-lite";
@@ -167,7 +167,7 @@ function wireItemCountControls() {
 }
 
 function patchExamConfig(source) {
-  // 1) Dynamic quota from UI
+  // Dynamic quota from UI
   source = source.replace(
     /function getExamQuota\(chunkIndex, totalChunks\) \{[\s\S]*?\n\}\n\nfunction buildPrompt/,
     "function getExamQuota(chunkIndex, totalChunks) {\n" +
@@ -182,41 +182,37 @@ function patchExamConfig(source) {
       "}\n\nfunction buildPrompt"
   );
 
-  // 2) Dynamic targetCounts in mergeExams
+  // Dynamic targetCounts values
   source = source.replace(
     "multiple_choice: 10,\n    true_false: 5,\n    identification: 3,\n    short_answer: 2",
-    "multiple_choice: ((window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).count ? window.__revdevDistributeTypes(window.__revdevGetExamSettings().count, window.__revdevGetExamSettings().types).multiple_choice : 10),\n" +
-      "    true_false: ((window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).count ? window.__revdevDistributeTypes(window.__revdevGetExamSettings().count, window.__revdevGetExamSettings().types).true_false : 5),\n" +
-      "    identification: ((window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).count ? window.__revdevDistributeTypes(window.__revdevGetExamSettings().count, window.__revdevGetExamSettings().types).identification : 3),\n" +
-      "    short_answer: ((window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).count ? window.__revdevDistributeTypes(window.__revdevGetExamSettings().count, window.__revdevGetExamSettings().types).short_answer : 2)"
+    "multiple_choice: (window.__revdevDistributeTypes((window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).count||20, (window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).types||[\"multiple_choice\"]).multiple_choice),\n" +
+      "    true_false: (window.__revdevDistributeTypes((window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).count||20, (window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).types||[\"true_false\"]).true_false),\n" +
+      "    identification: (window.__revdevDistributeTypes((window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).count||20, (window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).types||[\"identification\"]).identification),\n" +
+      "    short_answer: (window.__revdevDistributeTypes((window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).count||20, (window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).types||[\"short_answer\"]).short_answer)"
   );
 
-  // 3) HARD disable the exact-20 validation (multiple strategies)
-  source = source.split("counts.multiple_choice !== 10").join("false");
-  source = source.split("counts.true_false !== 5").join("false");
-  source = source.split("counts.identification !== 3").join("false");
-  source = source.split("counts.short_answer !== 2").join("false");
+  // HARD disable exact-20 validation — condition becomes always false
+  source = source.replace(/counts\.multiple_choice !== 10/g, "false");
+  source = source.replace(/counts\.true_false !== 5/g, "false");
+  source = source.replace(/counts\.identification !== 3/g, "false");
+  source = source.replace(/counts\.short_answer !== 2/g, "false");
 
-  source = source.split(
-    "The AI generated fewer than 20 unique source-backed exam questions. Try generating again or use a smaller topic focus."
-  ).join(
+  source = source.replace(
+    /The AI generated fewer than 20 unique source-backed exam questions\. Try generating again or use a smaller topic focus\./g,
     "The AI could not generate enough unique source-backed exam questions from the file. Try again, lower the item count, or use a broader topic focus."
   );
 
-  // Only fail if zero questions made it through
-  source = source.replace(
-    /if \(\s*false\s*\|\|\s*false\s*\|\|\s*false\s*\|\|\s*false\s*\) \{/,n    "if (chosen.length < 1) {"
-  );
-
   // Prompt / status copy
-  source = source.split("a 20-item mock exam").join("a mock exam");
-  source = source.split(
-    "exactly 10 multiple_choice, 5 true_false, 3 identification, and 2 short_answer questions"
-  ).join("the question counts listed in the EXACT QUOTA for this chunk");
-  source = source.split(
-    "Done. Generated a 20-item mock exam with 10 multiple choice, 5 true/false, 3 identification, and 2 short-answer questions."
-  ).join("Done. Generated the mock exam from your selected item count and question types.");
-  source = source.split("Answer all 20 questions.").join("Answer all questions.");
+  source = source.replace(/a 20-item mock exam/g, "a mock exam");
+  source = source.replace(
+    /exactly 10 multiple_choice, 5 true_false, 3 identification, and 2 short_answer questions/g,
+    "the question counts listed in the EXACT QUOTA for this chunk"
+  );
+  source = source.replace(
+    /Done\. Generated a 20-item mock exam with 10 multiple choice, 5 true\/false, 3 identification, and 2 short-answer questions\./g,
+    "Done. Generated the mock exam from your selected item count and question types."
+  );
+  source = source.replace(/Answer all 20 questions\./g, "Answer all questions.");
 
   return source;
 }
@@ -227,7 +223,7 @@ const CDN_APP =
 async function revdevLoadApp() {
   ensureCloudAiUi();
   wireItemCountControls();
-  const response = await fetch(CDN_APP + "?v=examfix4");
+  const response = await fetch(CDN_APP + "?v=examfix5");
   if (!response.ok) throw new Error("Could not load RevDev application module.");
   let source = await response.text();
   source = patchExamConfig(source);
@@ -235,7 +231,7 @@ async function revdevLoadApp() {
   if (source.indexOf("counts.multiple_choice !== 10") !== -1) {
     console.error("RevDev: failed to neutralize 20-question check");
   } else {
-    console.info("RevDev: exam count validation patched (v4)");
+    console.info("RevDev: exam count validation patched (v5)");
   }
 
   const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
