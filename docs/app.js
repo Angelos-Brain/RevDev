@@ -1,4 +1,4 @@
-/* RevDev loader: dual-key app from backup + count/render sync + selection + review + retake fixes */
+/* RevDev loader: dual-key app from backup + count/selection/review/retake v3 */
 const src = await fetch("https://cdn.jsdelivr.net/gh/Angelos-Brain/RevDev@backup-before-grok-2026-10-10/docs/app.js");
 if (!src.ok) throw new Error("Failed to load RevDev app.js from backup");
 const code = await src.text();
@@ -51,6 +51,7 @@ await import(blobUrl);
     if (job && Array.isArray(job.collected)) return job.collected;
     var last = window.__revdevLastResult;
     if (last && Array.isArray(last.items)) return last.items;
+    if (Array.isArray(window.__revdevPristineExamItems)) return window.__revdevPristineExamItems;
     return [];
   }
 
@@ -161,13 +162,22 @@ await import(blobUrl);
     runId = "r" + Date.now().toString(36);
     answerState = Object.create(null);
     formBound = false;
+    window.__revdevAnswerState = answerState;
+    window.__revdevExamSubmitted = false;
     if (out) out.hidden = false;
     if (qs("flashcards-output")) qs("flashcards-output").hidden = true;
     if (qs("summary-output")) qs("summary-output").hidden = true;
     if (count) count.textContent = items.length + " questions";
     if (intro) intro.textContent = "Answer all questions. Unanswered questions are scored as incorrect.";
     form.innerHTML = "";
+    form.removeAttribute("data-review");
     items.forEach(function (question, index) {
+      try {
+        delete question.userAnswer;
+        delete question.status;
+        delete question.result;
+        delete question._review;
+      } catch (e) {}
       var fs = document.createElement("fieldset");
       fs.className = "exam-question";
       fs.dataset.index = String(index);
@@ -219,9 +229,6 @@ await import(blobUrl);
     });
     bindFormOnce(form);
     updateAnsweredCounter();
-    if (form.querySelectorAll(".exam-question").length !== items.length) {
-      console.error("RevDev: rendered count differs from finalItems.length");
-    }
   }
 
   function reconcile() {
@@ -276,6 +283,15 @@ await import(blobUrl);
   var existingForm = qs("exam-form");
   if (existingForm) bindFormOnce(existingForm);
   window.__revdevRenderExamClean = renderExam;
+  window.__revdevResetAnswerState = function () {
+    answerState = Object.create(null);
+    formBound = false;
+    window.__revdevAnswerState = answerState;
+  };
+  window.__revdevBindExamForm = function (form) {
+    formBound = false;
+    bindFormOnce(form);
+  };
   console.info("RevDev: count/render sync + selection fix armed");
 })();
 
@@ -296,6 +312,8 @@ await import(blobUrl);
   function markForm(outcomes) {
     var form = document.getElementById("exam-form");
     if (!form || !outcomes || !outcomes.length) return;
+    window.__revdevExamSubmitted = true;
+    window.__revdevExamResults = outcomes;
 
     outcomes.forEach(function (outcome, index) {
       var fieldset =
@@ -433,11 +451,21 @@ await import(blobUrl);
   console.info("RevDev: exam review mark/explanation fix armed");
 })();
 
-/* Retake: full clean rebuild from the original items array (no AI call). */
+/* Retake v3: capture-phase handler + full DOM rebuild in taking mode only. */
 (function fixExamRetake() {
+  var TYPE_MAP = {
+    multiple_choice: "Multiple choice",
+    true_false: "True/False",
+    identification: "Identification",
+    short_answer: "Short answer"
+  };
+
   function qs(id) { return document.getElementById(id); }
 
-  function getItems() {
+  function snapshotItems() {
+    if (Array.isArray(window.__revdevPristineExamItems) && window.__revdevPristineExamItems.length) {
+      return window.__revdevPristineExamItems;
+    }
     var job = window.__revdevJob;
     if (job && Array.isArray(job.collected) && job.collected.length) return job.collected;
     var last = window.__revdevLastResult;
@@ -447,68 +475,141 @@ await import(blobUrl);
 
   function clearResultsUi() {
     var results = qs("exam-results");
-    var answerReview = qs("answer-review");
-    var weakTopics = qs("weak-topics");
-    var scoreEl = qs("exam-score");
-    var percentEl = qs("exam-percent");
     if (results) results.hidden = true;
+    var answerReview = qs("answer-review");
     if (answerReview) answerReview.innerHTML = "";
+    var weakTopics = qs("weak-topics");
     if (weakTopics) weakTopics.innerHTML = "";
+    var scoreEl = qs("exam-score");
     if (scoreEl) scoreEl.textContent = "0 / 0";
+    var percentEl = qs("exam-percent");
     if (percentEl) percentEl.textContent = "0%";
   }
 
   function resetButtons() {
     var submitBtn = qs("submit-exam");
     var retakeBtn = qs("retake-exam");
-    if (submitBtn) {
-      submitBtn.hidden = false;
-      submitBtn.disabled = false;
-    }
+    if (submitBtn) { submitBtn.hidden = false; submitBtn.disabled = false; }
     if (retakeBtn) retakeBtn.hidden = true;
   }
 
-  function updateAnsweredZero(n) {
-    var el = qs("answered-count");
-    if (el) el.textContent = "Answered 0 of " + n;
+  function renderTaking(items) {
+    var form = qs("exam-form");
+    if (!form) return;
+    var runId = "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+    if (typeof window.__revdevResetAnswerState === "function") window.__revdevResetAnswerState();
+    window.__revdevAnswerState = Object.create(null);
+    window.__revdevExamSubmitted = false;
+    window.__revdevExamResults = null;
+
+    form.innerHTML = "";
+    form.removeAttribute("data-review");
+
+    items.forEach(function (question, index) {
+      try {
+        delete question.userAnswer;
+        delete question.status;
+        delete question.result;
+        delete question._review;
+      } catch (e) {}
+
+      var fs = document.createElement("fieldset");
+      fs.className = "exam-question";
+      fs.dataset.index = String(index);
+      var typeKey = String(question.type || "").toLowerCase().replace(/\s+/g, "_");
+      var typeLabel = TYPE_MAP[typeKey] || String(question.type || "").replace(/_/g, " ");
+      var legend = document.createElement("legend");
+      legend.innerHTML =
+        '<span class="question-number">' + String(index + 1).padStart(2, "0") + "</span>" +
+        '<span class="question-type">' + typeLabel + "</span>" +
+        '<span class="question-text"></span>';
+      legend.querySelector(".question-text").textContent = question.question || "";
+      fs.appendChild(legend);
+
+      var name = "question-" + index;
+      if (question.type === "multiple_choice" || question.type === "true_false") {
+        var opts = document.createElement("div");
+        opts.className = "question-options";
+        opts.setAttribute("role", "radiogroup");
+        (question.options || []).forEach(function (option, oi) {
+          var letter = String.fromCharCode(65 + oi);
+          var id = runId + "-q" + index + "-" + letter;
+          var label = document.createElement("label");
+          label.className = "choice-option";
+          label.htmlFor = id;
+          var input = document.createElement("input");
+          input.type = "radio";
+          input.name = name;
+          input.id = id;
+          input.value = option;
+          var marker = document.createElement("span");
+          marker.className = "choice-marker";
+          marker.textContent = letter;
+          var val = document.createElement("span");
+          val.textContent = option;
+          label.append(input, marker, val);
+          opts.appendChild(label);
+        });
+        fs.appendChild(opts);
+      } else {
+        var input = document.createElement("input");
+        input.className = "answer-input";
+        input.type = "text";
+        input.name = name;
+        input.id = runId + "-q" + index + "-text";
+        input.autocomplete = "off";
+        input.placeholder = "Type your answer";
+        fs.appendChild(input);
+      }
+      form.appendChild(fs);
+    });
+
+    var count = qs("exam-count");
+    if (count) count.textContent = items.length + " questions";
+    var intro = qs("exam-intro");
+    if (intro) intro.textContent = "Answer all questions. Unanswered questions are scored as incorrect.";
+    var answered = qs("answered-count");
+    if (answered) answered.textContent = "Answered 0 of " + items.length;
+
+    if (typeof window.__revdevBindExamForm === "function") {
+      window.__revdevBindExamForm(form);
+    }
+  }
+
+  function assertCleanExam() {
+    var form = qs("exam-form");
+    if (!form) return [];
+    var leftovers = [];
+    var reviewSel =
+      ".review-status, .result-mark, .exam-inline-result, .exam-explanation, " +
+      ".explanation-box, .answer-feedback, .review-answer-line";
+    if (form.querySelector(reviewSel)) leftovers.push("review-nodes");
+    if (form.querySelector(".is-correct, .is-incorrect, .is-unanswered, .is-no-key")) leftovers.push("card-review-class");
+    if (form.querySelector(".is-user-correct, .is-user-wrong, .is-correct-answer, .is-right-answer, .selected")) leftovers.push("option-review-class");
+    if (form.querySelector("input:checked")) leftovers.push("checked-input");
+    if (form.querySelector("input:disabled, textarea:disabled, select:disabled")) leftovers.push("disabled-input");
+    var results = qs("exam-results");
+    if (results && !results.hidden) leftovers.push("score-summary-visible");
+    if (leftovers.length) console.error("RevDev assertCleanExam leftovers:", leftovers);
+    else console.info("RevDev assertCleanExam: clean");
+    return leftovers;
   }
 
   function rebuildCleanExam() {
-    var items = getItems();
+    var items = snapshotItems();
     if (!items.length) {
-      console.warn("RevDev: retake has no stored questions");
+      console.error("RevDev: retake aborted — no stored questions");
       return;
     }
-    if (typeof window.__revdevRenderExamClean === "function") {
-      window.__revdevRenderExamClean(items);
-    } else {
-      var form = qs("exam-form");
-      if (!form) return;
-      form.querySelectorAll(".exam-question").forEach(function (fs) {
-        fs.classList.remove("is-correct", "is-incorrect", "is-unanswered", "is-no-key");
-        fs.querySelectorAll(".choice-option").forEach(function (opt) {
-          opt.classList.remove(
-            "is-correct", "is-user-correct", "is-user-wrong",
-            "is-right-answer", "is-correct-answer", "selected"
-          );
-        });
-        fs.querySelectorAll(
-          ".review-status, .result-mark, .exam-inline-result, .exam-explanation, " +
-          ".explanation-box, .answer-feedback, .review-answer-line"
-        ).forEach(function (node) { node.remove(); });
-        fs.querySelectorAll("input, textarea, select").forEach(function (el) {
-          el.disabled = false;
-          if (el.type === "radio" || el.type === "checkbox") el.checked = false;
-          else el.value = "";
-        });
-      });
-    }
+    renderTaking(items);
     clearResultsUi();
     resetButtons();
-    updateAnsweredZero(items.length);
-    var form = qs("exam-form");
+    assertCleanExam();
+
     var out = qs("exam-output");
     if (out) out.scrollIntoView({ behavior: "smooth", block: "start" });
+    var form = qs("exam-form");
     if (form) {
       var first = form.querySelector('input[type="radio"], input[type="text"]');
       if (first) {
@@ -517,33 +618,66 @@ await import(blobUrl);
     }
   }
 
-  function bindRetake() {
-    var retakeBtn = qs("retake-exam");
-    if (!retakeBtn) return;
-    var fresh = retakeBtn.cloneNode(true);
-    retakeBtn.parentNode.replaceChild(fresh, retakeBtn);
-    fresh.addEventListener("click", function (event) {
+  document.addEventListener(
+    "click",
+    function (event) {
+      var btn = event.target && event.target.closest && event.target.closest("#retake-exam");
+      if (!btn) return;
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
+      rebuildCleanExam();
+    },
+    true
+  );
+
+  function bindButton() {
+    var retakeBtn = qs("retake-exam");
+    if (!retakeBtn || retakeBtn.__revdevRetakeV3) return;
+    retakeBtn.__revdevRetakeV3 = true;
+    retakeBtn.type = "button";
+    retakeBtn.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
       rebuildCleanExam();
     });
   }
-
-  bindRetake();
-  setTimeout(bindRetake, 500);
-  setTimeout(bindRetake, 2000);
+  bindButton();
+  setTimeout(bindButton, 300);
+  setTimeout(bindButton, 1500);
 
   var actions = document.querySelector(".exam-actions");
   if (actions) {
-    var mo = new MutationObserver(function () {
+    new MutationObserver(function () {
       var btn = qs("retake-exam");
-      if (btn && !btn.hidden && !btn.__revdevRetakeV2) {
-        btn.__revdevRetakeV2 = true;
-        bindRetake();
-      }
-    });
-    mo.observe(actions, { attributes: true, subtree: true, attributeFilter: ["hidden"] });
+      if (btn && !btn.hidden) bindButton();
+    }).observe(actions, { attributes: true, subtree: true, attributeFilter: ["hidden"] });
   }
 
-  console.info("RevDev: exam retake full-reset armed");
+  var statusEl = qs("generation-status");
+  if (statusEl) {
+    new MutationObserver(function () {
+      var text = statusEl.textContent || "";
+      if (!/Done\.|Generated \d+/i.test(text)) return;
+      var items = snapshotItems();
+      if (!items.length) {
+        var job = window.__revdevJob;
+        if (job && Array.isArray(job.collected)) items = job.collected;
+      }
+      if (items.length) {
+        try {
+          window.__revdevPristineExamItems = items.map(function (q) {
+            return {
+              type: q.type,
+              question: q.question,
+              options: Array.isArray(q.options) ? q.options.slice() : q.options,
+              answers: Array.isArray(q.answers) ? q.answers.slice() : q.answers,
+              explanation: q.explanation
+            };
+          });
+        } catch (e) {}
+      }
+    }).observe(statusEl, { childList: true, characterData: true, subtree: true });
+  }
+
+  console.info("RevDev: exam retake v3 (full taking-mode rebuild) armed");
 })();
