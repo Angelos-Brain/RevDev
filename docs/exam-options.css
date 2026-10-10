@@ -1,0 +1,65 @@
+/* Mock exam options */
+.exam-options {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #f8faff;
+}
+.exam-options-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.exam-options-grid {
+  display: grid;
+  grid-template-columns: minmax(140px, 180px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.exam-count-field input[type="number"] {
+  width: 100%;
+  max-width: 120px;
+}
+.field-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.exam-type-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.exam-type-fieldset legend {
+  padding: 0;
+  margin-bottom: 8px;
+}
+.exam-type-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+}
+.check-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text);
+  cursor: pointer;
+}
+.check-option input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+@media (max-width: 720px) {
+  .exam-options-grid { grid-template-columns: 1fr; }
+  .exam-type-list { grid-template-columns: 1fr; }
+}
