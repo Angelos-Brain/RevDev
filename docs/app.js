@@ -1,4 +1,4 @@
-/* RevDev — cloud AI bootstrap (Gemini / Groq). No local model download. */
+/* RevDev — cloud AI bootstrap (Gemini / Groq) + configurable exam count */
 (function () {
   const originalFetch = window.fetch.bind(window);
   const GEMINI_FREE_MODEL = "gemini-3.5-flash-lite";
@@ -63,47 +63,38 @@
   };
 })();
 
-/** Replace WebLLM panel with Gemini/Groq provider + API key fields the cloud app expects. */
 function ensureCloudAiUi() {
   const aiCard = document.querySelector(".ai-card");
   if (!aiCard) return;
-
   if (!document.getElementById("provider-select")) {
     aiCard.innerHTML =
-      '<div class="card-heading">' +
-      '<div><span class="section-kicker">2 · CONNECT FREE AI</span>' +
-      "<h2>Choose a provider</h2></div>" +
-      '<span class="mini-note">No backend server</span></div>' +
+      '<div class="card-heading"><div><span class="section-kicker">2 · CONNECT FREE AI</span>' +
+      "<h2>Choose a provider</h2></div><span class=\"mini-note\">No backend server</span></div>" +
       '<div class="settings-grid">' +
       '<label class="field"><span class="field-label">AI provider</span>' +
-      '<select id="provider-select">' +
-      '<option value="gemini">Google Gemini (default)</option>' +
+      '<select id="provider-select"><option value="gemini">Google Gemini (default)</option>' +
       '<option value="groq">Groq</option></select></label>' +
       '<label class="field api-key-field"><span class="field-label">API key</span>' +
       '<div class="api-key-row">' +
       '<input id="api-key" type="password" placeholder="Paste your free API key" autocomplete="off" spellcheck="false">' +
       '<button class="button secondary small-button" id="toggle-key" type="button">Show</button>' +
       "</div></label></div>" +
-      '<div id="gemini-help" class="provider-help">' +
-      "<strong>Gemini</strong><p>Get a free key at Google AI Studio. Uses <code>gemini-3.5-flash-lite</code>. " +
+      '<div id="gemini-help" class="provider-help"><strong>Gemini</strong>' +
+      "<p>Get a free key at Google AI Studio. Uses <code>gemini-3.5-flash-lite</code>. " +
       "If you hit a limit, wait a few minutes or switch to Groq.</p>" +
       '<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Open Google AI Studio</a></div>' +
-      '<div id="groq-help" class="provider-help" hidden>' +
-      "<strong>Groq</strong><p>Get a free Groq API key for fast generation.</p>" +
+      '<div id="groq-help" class="provider-help" hidden><strong>Groq</strong>' +
+      "<p>Get a free Groq API key for fast generation.</p>" +
       '<a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Open Groq Console</a></div>' +
-      '<p class="storage-note"><span class="dot"></span> ' +
-      "The key is saved only in this browser. It is sent only to the provider you select.</p>";
+      '<p class="storage-note"><span class="dot"></span> The key is saved only in this browser. It is sent only to the provider you select.</p>';
   }
-
   const pill = document.querySelector(".status-pill");
   if (pill) pill.textContent = "Free AI · Gemini / Groq";
-
   const hero = document.querySelector(".hero-copy");
   if (hero) {
     hero.textContent =
       "Upload your files, keep the source text in your browser, then use your own free Gemini or Groq key to generate study material.";
   }
-
   const privacy = document.querySelector(".privacy-note p");
   if (privacy) {
     privacy.textContent =
@@ -111,16 +102,151 @@ function ensureCloudAiUi() {
   }
 }
 
+/** Read count + selected question types from the UI. */
+window.__revdevGetExamSettings = function () {
+  const slider = document.getElementById("item-count-slider");
+  const number = document.getElementById("item-count");
+  let count = number ? Number(number.value) : slider ? Number(slider.value) : 20;
+  if (!Number.isFinite(count)) count = 20;
+  count = Math.max(1, Math.min(100, Math.round(count)));
+  const checks = document.querySelectorAll('input[name="exam-type"]');
+  let types = Array.from(checks)
+    .filter(function (c) { return c.checked; })
+    .map(function (c) { return c.value; });
+  if (!types.length) {
+    types = ["multiple_choice", "true_false", "identification", "short_answer"];
+  }
+  return { count: count, types: types };
+};
+
+/** Evenly split total across selected types. */
+window.__revdevDistributeTypes = function (total, types) {
+  const result = {
+    multiple_choice: 0,
+    true_false: 0,
+    identification: 0,
+    short_answer: 0
+  };
+  if (!types.length || total < 1) return result;
+  const base = Math.floor(total / types.length);
+  let rem = total - base * types.length;
+  types.forEach(function (t) {
+    result[t] = base + (rem > 0 ? 1 : 0);
+    if (rem > 0) rem -= 1;
+  });
+  return result;
+};
+
+function wireItemCountControls() {
+  const slider = document.getElementById("item-count-slider");
+  const number = document.getElementById("item-count");
+  if (!slider && !number) return;
+
+  function clamp(v) {
+    v = Number(v);
+    if (!Number.isFinite(v)) v = 20;
+    return Math.max(1, Math.min(100, Math.round(v)));
+  }
+
+  function syncFrom(source) {
+    const v = clamp(source.value);
+    if (slider) slider.value = String(v);
+    if (number) number.value = String(v);
+    try {
+      localStorage.setItem("revdev_item_count", String(v));
+    } catch (e) {}
+  }
+
+  if (slider) {
+    slider.min = "1";
+    slider.max = "100";
+    slider.addEventListener("input", function () { syncFrom(slider); });
+    slider.addEventListener("change", function () { syncFrom(slider); });
+  }
+  if (number) {
+    number.min = "1";
+    number.max = "100";
+    number.addEventListener("input", function () { syncFrom(number); });
+    number.addEventListener("change", function () { syncFrom(number); });
+  }
+
+  let saved = 20;
+  try {
+    saved = clamp(localStorage.getItem("revdev_item_count") || "20");
+  } catch (e) {}
+  if (slider) slider.value = String(saved);
+  if (number) number.value = String(saved);
+
+  const mode = document.getElementById("mode-select");
+  const examPanel = document.getElementById("exam-options");
+  function updateVisibility() {
+    if (examPanel && mode) examPanel.hidden = mode.value !== "exam";
+  }
+  if (mode) mode.addEventListener("change", updateVisibility);
+  updateVisibility();
+}
+
+function patchExamConfig(source) {
+  // Replace fixed getExamQuota with dynamic version driven by UI settings.
+  const newQuota =
+    "function getExamQuota(chunkIndex, totalChunks) {\n" +
+    "  const settings = (window.__revdevGetExamSettings && window.__revdevGetExamSettings()) || { count: 20, types: [\"multiple_choice\",\"true_false\",\"identification\",\"short_answer\"] };\n" +
+    "  const dist = window.__revdevDistributeTypes(settings.count, settings.types);\n" +
+    "  return {\n" +
+    "    multiple_choice: distributeExamQuota(dist.multiple_choice, chunkIndex, totalChunks),\n" +
+    "    true_false: distributeExamQuota(dist.true_false, chunkIndex, totalChunks),\n" +
+    "    identification: distributeExamQuota(dist.identification, chunkIndex, totalChunks),\n" +
+    "    short_answer: distributeExamQuota(dist.short_answer, chunkIndex, totalChunks)\n" +
+    "  };\n" +
+    "}\n";
+
+  source = source.replace(
+    /function getExamQuota\(chunkIndex, totalChunks\) \{[\s\S]*?\n\}\n\nfunction buildPrompt/,
+    newQuota + "\nfunction buildPrompt"
+  );
+
+  // Replace fixed mergeExams targetCounts
+  source = source.replace(
+    /const targetCounts = \{\s*multiple_choice: 10,\s*true_false: 5,\s*identification: 3,\s*short_answer: 2\s*\};/,
+    "const __settings = (window.__revdevGetExamSettings && window.__revdevGetExamSettings()) || { count: 20, types: [\"multiple_choice\",\"true_false\",\"identification\",\"short_answer\"] };\n" +
+      "  const targetCounts = window.__revdevDistributeTypes(__settings.count, __settings.types);"
+  );
+
+  // Soften hardcoded 20-item prompt language
+  source = source.replace(
+    /Create a candidate section of a 20-item mock exam from only this source chunk\./g,
+    "Create a candidate section of a mock exam from only this source chunk."
+  );
+  source = source.replace(
+    /The full exam must contain exactly 10 multiple_choice, 5 true_false, 3 identification, and 2 short_answer questions\./g,
+    "The full exam size and type mix are defined by the EXACT QUOTA for this chunk. Only use the types listed in that quota (0 means skip that type)."
+  );
+  source = source.replace(
+    /Done\. Generated a 20-item mock exam with 10 multiple choice, 5 true\/false, 3 identification, and 2 short-answer questions\./g,
+    "Done. Generated the mock exam from your selected item count and question types."
+  );
+  source = source.replace(
+    /Answer all 20 questions\. Unanswered questions are scored as incorrect\./g,
+    "Answer all questions. Unanswered questions are scored as incorrect."
+  );
+
+  return source;
+}
+
 const CDN_APP =
   "https://cdn.jsdelivr.net/gh/Angelos-Brain/RevDev@c151cf08a68250e6b1477b6f2c339246181b48f4/docs/app.js";
 
 async function revdevLoadApp() {
   ensureCloudAiUi();
+  wireItemCountControls();
   const response = await fetch(CDN_APP);
   if (!response.ok) throw new Error("Could not load RevDev application module.");
-  const source = await response.text();
+  let source = await response.text();
+  source = patchExamConfig(source);
   const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
   await import(url);
+  // Re-wire after app init in case app replaced nodes
+  wireItemCountControls();
 }
 
 await revdevLoadApp();
