@@ -1,4 +1,4 @@
-/* RevDev loader: dual-key app from known-good CDN commit + full-count fill */
+/* RevDev loader: dual-key app + quality exam prompts + full-count top-up */
 (function ensureLegacyElements() {
   const stubs = [
     { id: "toggle-key", tag: "button", type: "button" },
@@ -83,6 +83,16 @@ async function inflateBase64Gzip(b64) {
   return new TextDecoder().decode(buf);
 }
 
+const QUALITY_RULES = [
+  "QUALITY RULES (mandatory):",
+  "- Test the SUBJECT MATTER a student must learn (concepts, definitions, how things work, comparisons, causes, steps, best practices).",
+  "- DO NOT ask about document metadata or layout: page counts, chapter numbers as navigation, table of contents, publication date, author, edition, preface-only trivia, file name, or how many pages the guide has.",
+  "- DO NOT ask \"which chapter covers X\" or \"on which page is Y\".",
+  "- Prefer questions like: What is…? How does…? Why is… used? What is the difference between…? What happens if…? Which statement is true about…?",
+  "- Wrong options must be plausible but clearly incorrect based on the source.",
+  "- Each explanation must teach the concept in 1–2 sentences, not just repeat the answer letter."
+].join("\n");
+
 const CDN = "https://cdn.jsdelivr.net/gh/Angelos-Brain/RevDev@3e34207/docs/";
 const parts = [];
 for (let i = 0; i < 4; i++) {
@@ -94,7 +104,29 @@ const source = await inflateBase64Gzip(parts.join(""));
 const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
 await import(url);
 
-/* After dual app loads: force full requested count by filling remaining items */
+/* Inject quality rules into every AI batch prompt */
+(function patchPromptQuality() {
+  if (typeof window.__revdevRunBatch !== "function") return;
+  const original = window.__revdevRunBatch;
+  window.__revdevRunBatch = async function (prompt, schema, systemText, preferredProvider, onStatus) {
+    let p = String(prompt || "");
+    const isExam = /exam questions|QUOTA for this batch|multiple_choice/i.test(p);
+    const isCards = /flashcards/i.test(p);
+    if (isExam || isCards) {
+      p = QUALITY_RULES + "\n\n" + p;
+    }
+    const sys = String(systemText || "") +
+      " You write high-quality study questions that test understanding of the subject, never document layout or metadata.";
+    return original.call(this, p, schema, sys, preferredProvider, onStatus);
+  };
+  console.info("RevDev: quality prompt filter armed");
+})();
+
+function isMetaQuestion(q) {
+  return /how many (total )?pages|which chapter covers|table of contents|prepared for|publication date|page markers|how many chapters|document states it was prepared|file name|study guide span/i.test(q);
+}
+
+/* Full-count top-up if dual finishes short */
 (function installFullCountFill() {
   function setStatus(msg, kind) {
     const el = document.getElementById("generation-status");
@@ -176,9 +208,9 @@ await import(url);
             ? window.__revdevDistributeTypes(need, types)
             : { multiple_choice: need };
           prompt = [
+            QUALITY_RULES,
             "Create EXACTLY " + need + " exam questions from ONLY this source text.",
             "You MUST return exactly " + need + " questions. Do not return fewer.",
-            "Cover the same facts from different angles if needed without inventing new facts.",
             "QUOTA: " + JSON.stringify(dist),
             "Types: multiple_choice, true_false, identification, short_answer.",
             avoidList.length ? "Do NOT repeat: " + JSON.stringify(avoidList) : "",
@@ -206,7 +238,9 @@ await import(url);
             required: ["cards"]
           };
           prompt = [
-            "Create EXACTLY " + need + " flashcards from ONLY this source.",
+            QUALITY_RULES,
+            "Create EXACTLY " + need + " conceptual flashcards from ONLY this source.",
+            "Front = term or question; back = clear definition or answer. No page/chapter trivia.",
             "You MUST return exactly " + need + " cards.",
             avoidList.length ? "Do NOT repeat fronts: " + JSON.stringify(avoidList) : "",
             "",
@@ -221,7 +255,7 @@ await import(url);
           const result = await window.__revdevRunBatch(
             prompt,
             schema,
-            "Use ONLY the source text. Return valid JSON matching the schema. Never invent facts.",
+            "Use ONLY the source text. Return valid JSON. Never invent facts. Never test document layout.",
             provider,
             function (msg) { setStatus(msg, ""); }
           );
@@ -231,6 +265,7 @@ await import(url);
             data.questions.forEach(function (q) {
               const key = String(q.question || "").trim().toLowerCase();
               if (!key || seen.has(key)) return;
+              if (isMetaQuestion(key)) return;
               seen.add(key);
               items.push(q);
             });
@@ -264,16 +299,6 @@ await import(url);
         setStatus("Done. Generated " + items.length + " item(s).", "success");
         setProgress(100);
         if (window.__revdevJob) window.__revdevJob.collected = items;
-        document.dispatchEvent(new CustomEvent("revdev-items-ready", { detail: { mode: mode, items: items } }));
-        // Re-click internal render if dual exposed a job render path via status
-        try {
-          const form = document.getElementById("exam-form");
-          const out = document.getElementById("exam-output");
-          if (out) out.hidden = false;
-          if (form && mode === "exam" && items.length && window.__revdevJob) {
-            // dual app's renderBatchResult is not global; leave items in job for submit scoring
-          }
-        } catch (e) {}
       } else {
         setStatus(
           "Generated " + items.length + " of " + requested +
