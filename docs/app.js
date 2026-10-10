@@ -1,4 +1,4 @@
-/* RevDev bootstrap — fetch gzip base64 parts and run */
+/* RevDev bootstrap — fetch gzip base64 parts, repair known packing artifact, run */
 async function inflateBase64Gzip(b64) {
   const binary = atob(b64);
   const bytes = new Uint8Array(binary.length);
@@ -9,6 +9,14 @@ async function inflateBase64Gzip(b64) {
   return new TextDecoder().decode(buf);
 }
 
+function repairPackedSource(source) {
+  // Packing leftover: import was partially inlined but this remnant remained.
+  return source.replace(
+    /\s*MODELS_CATALOG,\s*getDefaultFallbackOrder,\s*getModelById\s*\}\s*from\s*["']\.\/models-catalog\.js["'];\s*/g,
+    "\n"
+  );
+}
+
 const base = new URL("./", import.meta.url);
 const names = ["pl.0.txt","pl.1.txt","pl.2.txt","pl.3.txt","pl.4.txt","pl.5.txt","pl.6.txt"];
 const parts = await Promise.all(
@@ -17,6 +25,6 @@ const parts = await Promise.all(
     return r.text();
   }))
 );
-const source = await inflateBase64Gzip(parts.join("").replace(/\s+/g, ""));
+const source = repairPackedSource(await inflateBase64Gzip(parts.join("").replace(/\s+/g, "")));
 const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
 await import(url);
