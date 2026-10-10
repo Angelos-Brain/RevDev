@@ -132,16 +132,16 @@ button { cursor: pointer; }
 .brand strong { display: block; font-size: 0.95rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
 @media (min-width: 400px) { .brand strong { font-size: 1rem; } }
 .brand small { display: block; color: var(--muted); font-size: 0.75rem; font-weight: 500; }
-@media (max-width: 380px) { .brand small { display: none; } }
+@media (max-width: 520px) { .brand small { display: none; } }
 .header-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 1; min-width: 0; }
 .status-pill {
-  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
+  display: none;
+  align-items: center; gap: 6px; padding: 6px 12px;
   border-radius: var(--radius-full); background: var(--surface); border: 1px solid var(--line);
-  color: var(--muted); font-size: 0.68rem; font-weight: 600; white-space: nowrap;
-  max-width: 42vw; overflow: hidden; text-overflow: ellipsis;
+  color: var(--muted); font-size: 0.75rem; font-weight: 600; white-space: nowrap;
 }
-@media (min-width: 640px) {
-  .status-pill { font-size: 0.75rem; padding: 6px 12px; max-width: none; }
+@media (min-width: 720px) {
+  .status-pill { display: inline-flex; }
 }
 .theme-toggle {
   width: 44px; height: 44px; border-radius: var(--radius-sm); border: 1px solid var(--line);
@@ -511,4 +511,7 @@ input[type="range"] {
   .stepper-item { min-width: 0; padding: 8px 10px; font-size: 0.78rem; }
   .dropzone { min-height: 120px; padding: 20px 12px; }
   .action-row .button { flex: 1 1 auto; }
+  .shell { width: min(1080px, calc(100% - 24px)); }
+  .page { padding: 16px 0 56px; }
+  h1 { font-size: 1.45rem; }
 }
