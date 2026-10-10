@@ -102,7 +102,6 @@ function ensureCloudAiUi() {
   }
 }
 
-/** Read count + selected question types from the UI. */
 window.__revdevGetExamSettings = function () {
   const slider = document.getElementById("item-count-slider");
   const number = document.getElementById("item-count");
@@ -119,7 +118,6 @@ window.__revdevGetExamSettings = function () {
   return { count: count, types: types };
 };
 
-/** Evenly split total across selected types. */
 window.__revdevDistributeTypes = function (total, types) {
   const result = {
     multiple_choice: 0,
@@ -187,7 +185,6 @@ function wireItemCountControls() {
 }
 
 function patchExamConfig(source) {
-  // Replace fixed getExamQuota with dynamic version driven by UI settings.
   const newQuota =
     "function getExamQuota(chunkIndex, totalChunks) {\n" +
     "  const settings = (window.__revdevGetExamSettings && window.__revdevGetExamSettings()) || { count: 20, types: [\"multiple_choice\",\"true_false\",\"identification\",\"short_answer\"] };\n" +
@@ -205,14 +202,29 @@ function patchExamConfig(source) {
     newQuota + "\nfunction buildPrompt"
   );
 
-  // Replace fixed mergeExams targetCounts
   source = source.replace(
     /const targetCounts = \{\s*multiple_choice: 10,\s*true_false: 5,\s*identification: 3,\s*short_answer: 2\s*\};/,
     "const __settings = (window.__revdevGetExamSettings && window.__revdevGetExamSettings()) || { count: 20, types: [\"multiple_choice\",\"true_false\",\"identification\",\"short_answer\"] };\n" +
       "  const targetCounts = window.__revdevDistributeTypes(__settings.count, __settings.types);"
   );
 
-  // Soften hardcoded 20-item prompt language
+  // Replace strict 10/5/3/2 validation with flexible check against requested targets.
+  // Accept whatever unique source-backed questions were produced (at least 1).
+  source = source.replace(
+    /if \(\s*counts\.multiple_choice !== 10 \|\|\s*counts\.true_false !== 5 \|\|\s*counts\.identification !== 3 \|\|\s*counts\.short_answer !== 2\s*\) \{\s*throw new Error\(\s*"The AI generated fewer than 20 unique source-backed exam questions\. Try generating again or use a smaller topic focus\."\s*\);\s*\}/,
+    "var __totalChosen = chosen.length;\n" +
+      "  if (__totalChosen < 1) {\n" +
+      "    throw new Error(\n" +
+      "      \"The AI could not generate unique source-backed exam questions. Try generating again or use a smaller topic focus.\"\n" +
+      "    );\n" +
+      "  }\n" +
+      "  if (__totalChosen < (__settings.count || 20)) {\n" +
+      "    console.warn(\n" +
+      "      \"RevDev: requested \" + (__settings.count || 20) + \" questions, got \" + __totalChosen + \" unique source-backed items.\"\n" +
+      "    );\n" +
+      "  }"
+  );
+
   source = source.replace(
     /Create a candidate section of a 20-item mock exam from only this source chunk\./g,
     "Create a candidate section of a mock exam from only this source chunk."
@@ -243,9 +255,20 @@ async function revdevLoadApp() {
   if (!response.ok) throw new Error("Could not load RevDev application module.");
   let source = await response.text();
   source = patchExamConfig(source);
+  // Verify critical patches applied
+  if (source.indexOf("fewer than 20 unique") !== -1) {
+    console.warn("RevDev: 20-question validation patch may have missed; applying fallback strip.");
+    source = source.replace(
+      /The AI generated fewer than 20 unique source-backed exam questions\. Try generating again or use a smaller topic focus\./g,
+      "The AI could not generate unique source-backed exam questions. Try generating again or use a smaller topic focus."
+    );
+    source = source.replace(
+      /counts\.multiple_choice !== 10/g,
+      "false && counts.multiple_choice !== 10"
+    );
+  }
   const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
   await import(url);
-  // Re-wire after app init in case app replaced nodes
   wireItemCountControls();
 }
 
