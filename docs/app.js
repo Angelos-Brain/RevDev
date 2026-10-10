@@ -1,4 +1,4 @@
-/* RevDev cloud bootstrap v7 — Gemini/Groq + flexible exams + working submit */
+/* RevDev cloud bootstrap v8 — inline green/red exam feedback on the form */
 (function () {
   const originalFetch = window.fetch.bind(window);
   const GEMINI_FREE_MODEL = "gemini-3.5-flash-lite";
@@ -64,6 +64,12 @@
 })();
 
 function ensureCloudAiUi() {
+  if (!document.querySelector('link[href*="exam-feedback.css"]')) {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "exam-feedback.css?v=8";
+    document.head.appendChild(link);
+  }
   const aiCard = document.querySelector(".ai-card");
   if (!aiCard) return;
   if (!document.getElementById("provider-select")) {
@@ -194,11 +200,7 @@ function patchExamConfig(source) {
     "The AI could not generate enough unique source-backed exam questions from the file. Try again, lower the item count, or use a broader topic focus."
   );
 
-  // Critical: unlock submit + retake for any exam length
-  source = source.replace(
-    /state\.exam\.length !== 20/g,
-    "state.exam.length < 1"
-  );
+  source = source.replace(/state\.exam\.length !== 20/g, "state.exam.length < 1");
 
   source = source.replace(/a 20-item mock exam/g, "a mock exam");
   source = source.replace(
@@ -211,78 +213,87 @@ function patchExamConfig(source) {
   );
   source = source.replace(/Answer all 20 questions\./g, "Answer all questions.");
 
+  source = source.replace(
+    "renderWeakTopics(outcomes);\n  renderAnswerReview(outcomes);",
+    "renderWeakTopics(outcomes);\n  renderAnswerReview(outcomes);\n  if (window.__revdevMarkExamForm) window.__revdevMarkExamForm(outcomes);"
+  );
+
   return source;
 }
 
-/** Fallback submit if the app module still fails to score. */
+/** Mark each question on the answer form: green = correct, red = wrong. */
+window.__revdevMarkExamForm = function (outcomes) {
+  const form = document.getElementById("exam-form");
+  if (!form || !outcomes || !outcomes.length) return;
+
+  outcomes.forEach(function (outcome, index) {
+    const fieldset =
+      form.querySelector('.exam-question[data-index="' + index + '"]') ||
+      form.querySelectorAll(".exam-question")[index];
+    if (!fieldset) return;
+
+    fieldset.classList.remove("is-correct", "is-incorrect");
+    fieldset.classList.add(outcome.correct ? "is-correct" : "is-incorrect");
+
+    fieldset.querySelectorAll("input, textarea, select").forEach(function (el) {
+      el.disabled = true;
+    });
+
+    const name = "question-" + index;
+    const selected = fieldset.querySelector('input[name="' + name + '"]:checked');
+    if (selected) {
+      const label = selected.closest(".choice-option");
+      if (label) {
+        label.classList.add(outcome.correct ? "is-user-correct" : "is-user-wrong");
+      }
+    }
+
+    if (!outcome.correct && outcome.question && outcome.question.answers) {
+      const accepted = outcome.question.answers.map(function (a) {
+        return String(a).trim().toLowerCase();
+      });
+      fieldset.querySelectorAll('input[name="' + name + '"]').forEach(function (input) {
+        if (accepted.indexOf(String(input.value).trim().toLowerCase()) !== -1) {
+          const lab = input.closest(".choice-option");
+          if (lab) lab.classList.add("is-right-answer");
+        }
+      });
+    }
+
+    let box = fieldset.querySelector(".exam-inline-result");
+    if (!box) {
+      box = document.createElement("div");
+      box.className = "exam-inline-result";
+      fieldset.appendChild(box);
+    }
+    const correctText = (outcome.question.answers || []).join(" / ") || "—";
+    const userText = outcome.userAnswer || "[not answered]";
+    const expl = outcome.question.explanation ? outcome.question.explanation : "";
+    box.innerHTML =
+      "<strong>" +
+      (outcome.correct ? "Correct" : "Incorrect") +
+      "</strong>" +
+      "Your answer: " +
+      userText +
+      "<br>Correct answer: " +
+      correctText +
+      (expl ? "<br>Explanation: " + expl : "");
+  });
+};
+
 function installSubmitFallback() {
   const btn = document.getElementById("submit-exam");
   const form = document.getElementById("exam-form");
   const results = document.getElementById("exam-results");
-  const scoreEl = document.getElementById("exam-score");
-  const percentEl = document.getElementById("exam-percent");
-  const reviewEl = document.getElementById("answer-review");
-  const retakeBtn = document.getElementById("retake-exam");
   if (!btn || !form) return;
 
   btn.addEventListener(
     "click",
-    function (event) {
-      // If results already visible, app handled it.
-      if (results && !results.hidden) return;
-
-      // Delay slightly so the app's own handler runs first.
+    function () {
       setTimeout(function () {
         if (results && !results.hidden) return;
-
-        const questions = form.querySelectorAll(".exam-question");
-        if (!questions.length) return;
-
-        let score = 0;
-        const total = questions.length;
-        const lines = [];
-
-        questions.forEach(function (q, index) {
-          const name = "question-" + index;
-          const selected = form.querySelector('input[name="' + name + '"]:checked');
-          const textInput = form.querySelector('input[type="text"][name="' + name + '"], textarea[name="' + name + '"]');
-          const userVal = selected
-            ? selected.value
-            : textInput
-              ? textInput.value.trim()
-              : "";
-          const answered = userVal.length > 0;
-          // Without answer keys in the DOM, mark answered vs blank only.
-          // Prefer app's internal scoring; this is last-resort feedback.
-          if (answered) score += 1;
-          lines.push(
-            (index + 1) +
-              ". " +
-              (answered ? "Answer recorded: " + userVal : "No answer")
-          );
-        });
-
-        // Only show fallback if still no results
-        if (results && results.hidden) {
-          console.warn("RevDev: using fallback submit UI (app scorer did not run)");
-          results.hidden = false;
-          if (scoreEl) scoreEl.textContent = score + " / " + total + " answered";
-          if (percentEl) {
-            percentEl.textContent =
-              Math.round((score / total) * 100) + "% answered";
-          }
-          if (reviewEl) {
-            reviewEl.innerHTML =
-              "<p><strong>Note:</strong> Full auto-grading did not attach. Your answers were recorded. " +
-              "Hard-refresh the page (Ctrl+Shift+R), regenerate the exam, and submit again for scored results.</p><ul>" +
-              lines.map(function (l) { return "<li>" + l + "</li>"; }).join("") +
-              "</ul>";
-          }
-          if (btn) btn.hidden = true;
-          if (retakeBtn) retakeBtn.hidden = false;
-          results.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-      }, 50);
+        console.warn("RevDev: submit produced no results panel; regenerate exam after hard refresh.");
+      }, 80);
     },
     true
   );
@@ -294,16 +305,15 @@ const CDN_APP =
 async function revdevLoadApp() {
   ensureCloudAiUi();
   wireItemCountControls();
-  const response = await fetch(CDN_APP + "?v=examfix7");
+  const response = await fetch(CDN_APP + "?v=examfix8");
   if (!response.ok) throw new Error("Could not load RevDev application module.");
   let source = await response.text();
   source = patchExamConfig(source);
 
-  const stillBlocked = /state\.exam\.length !== 20/.test(source);
-  if (stillBlocked) {
+  if (/state\.exam\.length !== 20/.test(source)) {
     console.error("RevDev: length!==20 still present after patch");
   } else {
-    console.info("RevDev: exam submit unlocked for any count (v7)");
+    console.info("RevDev: inline exam feedback ready (v8)");
   }
 
   const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
