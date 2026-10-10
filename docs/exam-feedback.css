@@ -1,24 +1,24 @@
-/* Inline exam grading + aligned choice rows */
+/* Inline exam grading + aligned choice rows — theme-aware */
 
 .exam-question.is-correct {
-  border-color: #1f9d63;
-  border-left: 5px solid #1f9d63;
-  background: #f0faf5;
+  border-color: var(--success);
+  border-left: 5px solid var(--success);
+  background: var(--success-soft);
 }
 
 .exam-question.is-incorrect {
-  border-color: #c44b4b;
-  border-left: 5px solid #c44b4b;
-  background: #fdf3f3;
+  border-color: var(--danger);
+  border-left: 5px solid var(--danger);
+  background: var(--danger-soft);
 }
 
 .exam-question.is-correct .question-number {
-  background: #1f9d63;
+  background: var(--success);
   color: #fff;
 }
 
 .exam-question.is-incorrect .question-number {
-  background: #c44b4b;
+  background: var(--danger);
   color: #fff;
 }
 
@@ -38,10 +38,21 @@
   box-sizing: border-box;
   margin: 0;
   padding: 10px 12px;
-  border: 1px solid var(--line, #dfe4ee);
-  border-radius: 11px;
-  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 11px);
+  background: var(--surface);
   min-height: 44px;
+  color: var(--text);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.exam-question .choice-option:hover {
+  border-color: var(--line-strong, var(--line));
+}
+
+.exam-question .choice-option:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
 }
 
 .exam-question .choice-option input[type="radio"],
@@ -52,7 +63,7 @@
   padding: 0;
   justify-self: center;
   align-self: center;
-  accent-color: #315efb;
+  accent-color: var(--primary);
   flex-shrink: 0;
 }
 
@@ -62,8 +73,8 @@
   display: grid;
   place-items: center;
   border-radius: 8px;
-  background: #eef1f6;
-  color: #657089;
+  background: var(--surface-2);
+  color: var(--muted);
   font-size: 0.7rem;
   font-weight: 900;
   line-height: 1;
@@ -78,97 +89,44 @@
 
 /* Graded states */
 .choice-option.is-user-correct {
-  border-color: #1f9d63 !important;
-  background: #e6f7ee !important;
+  border-color: var(--success) !important;
+  background: var(--success-soft) !important;
   outline: none;
 }
 
 .choice-option.is-user-correct .choice-marker {
-  background: #1f9d63 !important;
+  background: var(--success) !important;
   color: #fff !important;
 }
 
 .choice-option.is-user-wrong {
-  border-color: #c44b4b !important;
-  background: #fdeaea !important;
+  border-color: var(--danger) !important;
+  background: var(--danger-soft) !important;
   outline: none;
 }
 
 .choice-option.is-user-wrong .choice-marker {
-  background: #c44b4b !important;
+  background: var(--danger) !important;
   color: #fff !important;
 }
 
-.choice-option.is-right-answer {
-  border-color: #1f9d63 !important;
-  outline: none;
+.choice-option.is-correct-answer {
+  border-color: var(--success) !important;
+  background: var(--success-soft) !important;
 }
 
-.choice-option.is-right-answer .choice-marker {
-  background: #1f9d63 !important;
+.choice-option.is-correct-answer .choice-marker {
+  background: var(--success) !important;
   color: #fff !important;
 }
 
-/* After grade, don't keep the blue selected marker look */
-.exam-question.is-correct .choice-option input:checked + .choice-marker,
-.exam-question.is-incorrect .choice-option input:checked + .choice-marker {
-  /* overridden by is-user-correct / is-user-wrong above */
-}
-
-.exam-inline-result {
-  margin-top: 12px;
+.exam-explanation {
+  margin-top: 10px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm, 10px);
+  background: var(--surface);
+  border: 1px solid var(--line);
   font-size: 0.88rem;
+  color: var(--text-secondary);
   line-height: 1.45;
-}
-
-.exam-question.is-correct .exam-inline-result {
-  background: #d8f3e5;
-  color: #145c3a;
-}
-
-.exam-question.is-incorrect .exam-inline-result {
-  background: #f8dede;
-  color: #7a2424;
-}
-
-.exam-inline-result strong {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.exam-question input:disabled,
-.exam-question textarea:disabled {
-  opacity: 0.9;
-  cursor: default;
-}
-
-/* Legend: number + type + text stay on one readable block */
-.exam-question legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 8px;
-  width: 100%;
-  padding: 0;
-  margin-bottom: 13px;
-  line-height: 1.45;
-}
-
-.exam-question .question-number {
-  flex: 0 0 30px;
-}
-
-.exam-question .question-type {
-  flex: 0 0 auto;
-  margin-top: 6px;
-}
-
-.exam-question .question-text {
-  flex: 1 1 200px;
-  min-width: 0;
 }
