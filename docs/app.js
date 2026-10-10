@@ -1,4 +1,4 @@
-/* RevDev — cloud AI bootstrap (Gemini / Groq) + configurable exam count */
+/* RevDev cloud bootstrap v4 — Gemini/Groq + flexible exam counts */
 (function () {
   const originalFetch = window.fetch.bind(window);
   const GEMINI_FREE_MODEL = "gemini-3.5-flash-lite";
@@ -80,13 +80,12 @@ function ensureCloudAiUi() {
       '<button class="button secondary small-button" id="toggle-key" type="button">Show</button>' +
       "</div></label></div>" +
       '<div id="gemini-help" class="provider-help"><strong>Gemini</strong>' +
-      "<p>Get a free key at Google AI Studio. Uses <code>gemini-3.5-flash-lite</code>. " +
-      "If you hit a limit, wait a few minutes or switch to Groq.</p>" +
+      "<p>Get a free key at Google AI Studio. Uses <code>gemini-3.5-flash-lite</code>.</p>" +
       '<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Open Google AI Studio</a></div>' +
       '<div id="groq-help" class="provider-help" hidden><strong>Groq</strong>' +
       "<p>Get a free Groq API key for fast generation.</p>" +
       '<a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Open Groq Console</a></div>' +
-      '<p class="storage-note"><span class="dot"></span> The key is saved only in this browser. It is sent only to the provider you select.</p>';
+      '<p class="storage-note"><span class="dot"></span> Key stays in this browser only.</p>';
   }
   const pill = document.querySelector(".status-pill");
   if (pill) pill.textContent = "Free AI · Gemini / Groq";
@@ -94,11 +93,6 @@ function ensureCloudAiUi() {
   if (hero) {
     hero.textContent =
       "Upload your files, keep the source text in your browser, then use your own free Gemini or Groq key to generate study material.";
-  }
-  const privacy = document.querySelector(".privacy-note p");
-  if (privacy) {
-    privacy.textContent =
-      "Files are read in your browser. Only extracted text is sent to the AI provider you choose. Your API key stays in this browser.";
   }
 }
 
@@ -150,97 +144,79 @@ function wireItemCountControls() {
     const v = clamp(source.value);
     if (slider) slider.value = String(v);
     if (number) number.value = String(v);
-    try {
-      localStorage.setItem("revdev_item_count", String(v));
-    } catch (e) {}
+    try { localStorage.setItem("revdev_item_count", String(v)); } catch (e) {}
   }
 
   if (slider) {
     slider.min = "1";
     slider.max = "100";
-    slider.addEventListener("input", function () { syncFrom(slider); });
-    slider.addEventListener("change", function () { syncFrom(slider); });
+    slider.oninput = function () { syncFrom(slider); };
+    slider.onchange = function () { syncFrom(slider); };
   }
   if (number) {
     number.min = "1";
     number.max = "100";
-    number.addEventListener("input", function () { syncFrom(number); });
-    number.addEventListener("change", function () { syncFrom(number); });
+    number.oninput = function () { syncFrom(number); };
+    number.onchange = function () { syncFrom(number); };
   }
 
   let saved = 20;
-  try {
-    saved = clamp(localStorage.getItem("revdev_item_count") || "20");
-  } catch (e) {}
+  try { saved = clamp(localStorage.getItem("revdev_item_count") || "20"); } catch (e) {}
   if (slider) slider.value = String(saved);
   if (number) number.value = String(saved);
-
-  const mode = document.getElementById("mode-select");
-  const examPanel = document.getElementById("exam-options");
-  function updateVisibility() {
-    if (examPanel && mode) examPanel.hidden = mode.value !== "exam";
-  }
-  if (mode) mode.addEventListener("change", updateVisibility);
-  updateVisibility();
 }
 
 function patchExamConfig(source) {
-  const newQuota =
-    "function getExamQuota(chunkIndex, totalChunks) {\n" +
-    "  const settings = (window.__revdevGetExamSettings && window.__revdevGetExamSettings()) || { count: 20, types: [\"multiple_choice\",\"true_false\",\"identification\",\"short_answer\"] };\n" +
-    "  const dist = window.__revdevDistributeTypes(settings.count, settings.types);\n" +
-    "  return {\n" +
-    "    multiple_choice: distributeExamQuota(dist.multiple_choice, chunkIndex, totalChunks),\n" +
-    "    true_false: distributeExamQuota(dist.true_false, chunkIndex, totalChunks),\n" +
-    "    identification: distributeExamQuota(dist.identification, chunkIndex, totalChunks),\n" +
-    "    short_answer: distributeExamQuota(dist.short_answer, chunkIndex, totalChunks)\n" +
-    "  };\n" +
-    "}\n";
-
+  // 1) Dynamic quota from UI
   source = source.replace(
     /function getExamQuota\(chunkIndex, totalChunks\) \{[\s\S]*?\n\}\n\nfunction buildPrompt/,
-    newQuota + "\nfunction buildPrompt"
+    "function getExamQuota(chunkIndex, totalChunks) {\n" +
+      "  const settings = (window.__revdevGetExamSettings && window.__revdevGetExamSettings()) || { count: 20, types: [\"multiple_choice\",\"true_false\",\"identification\",\"short_answer\"] };\n" +
+      "  const dist = window.__revdevDistributeTypes(settings.count, settings.types);\n" +
+      "  return {\n" +
+      "    multiple_choice: distributeExamQuota(dist.multiple_choice, chunkIndex, totalChunks),\n" +
+      "    true_false: distributeExamQuota(dist.true_false, chunkIndex, totalChunks),\n" +
+      "    identification: distributeExamQuota(dist.identification, chunkIndex, totalChunks),\n" +
+      "    short_answer: distributeExamQuota(dist.short_answer, chunkIndex, totalChunks)\n" +
+      "  };\n" +
+      "}\n\nfunction buildPrompt"
   );
 
+  // 2) Dynamic targetCounts in mergeExams
   source = source.replace(
-    /const targetCounts = \{\s*multiple_choice: 10,\s*true_false: 5,\s*identification: 3,\s*short_answer: 2\s*\};/,
-    "const __settings = (window.__revdevGetExamSettings && window.__revdevGetExamSettings()) || { count: 20, types: [\"multiple_choice\",\"true_false\",\"identification\",\"short_answer\"] };\n" +
-      "  const targetCounts = window.__revdevDistributeTypes(__settings.count, __settings.types);"
+    "multiple_choice: 10,\n    true_false: 5,\n    identification: 3,\n    short_answer: 2",
+    "multiple_choice: ((window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).count ? window.__revdevDistributeTypes(window.__revdevGetExamSettings().count, window.__revdevGetExamSettings().types).multiple_choice : 10),\n" +
+      "    true_false: ((window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).count ? window.__revdevDistributeTypes(window.__revdevGetExamSettings().count, window.__revdevGetExamSettings().types).true_false : 5),\n" +
+      "    identification: ((window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).count ? window.__revdevDistributeTypes(window.__revdevGetExamSettings().count, window.__revdevGetExamSettings().types).identification : 3),\n" +
+      "    short_answer: ((window.__revdevGetExamSettings&&window.__revdevGetExamSettings()).count ? window.__revdevDistributeTypes(window.__revdevGetExamSettings().count, window.__revdevGetExamSettings().types).short_answer : 2)"
   );
 
-  // Replace strict 10/5/3/2 validation with flexible check against requested targets.
-  // Accept whatever unique source-backed questions were produced (at least 1).
-  source = source.replace(
-    /if \(\s*counts\.multiple_choice !== 10 \|\|\s*counts\.true_false !== 5 \|\|\s*counts\.identification !== 3 \|\|\s*counts\.short_answer !== 2\s*\) \{\s*throw new Error\(\s*"The AI generated fewer than 20 unique source-backed exam questions\. Try generating again or use a smaller topic focus\."\s*\);\s*\}/,
-    "var __totalChosen = chosen.length;\n" +
-      "  if (__totalChosen < 1) {\n" +
-      "    throw new Error(\n" +
-      "      \"The AI could not generate unique source-backed exam questions. Try generating again or use a smaller topic focus.\"\n" +
-      "    );\n" +
-      "  }\n" +
-      "  if (__totalChosen < (__settings.count || 20)) {\n" +
-      "    console.warn(\n" +
-      "      \"RevDev: requested \" + (__settings.count || 20) + \" questions, got \" + __totalChosen + \" unique source-backed items.\"\n" +
-      "    );\n" +
-      "  }"
+  // 3) HARD disable the exact-20 validation (multiple strategies)
+  source = source.split("counts.multiple_choice !== 10").join("false");
+  source = source.split("counts.true_false !== 5").join("false");
+  source = source.split("counts.identification !== 3").join("false");
+  source = source.split("counts.short_answer !== 2").join("false");
+
+  source = source.split(
+    "The AI generated fewer than 20 unique source-backed exam questions. Try generating again or use a smaller topic focus."
+  ).join(
+    "The AI could not generate enough unique source-backed exam questions from the file. Try again, lower the item count, or use a broader topic focus."
   );
 
+  // Only fail if zero questions made it through
   source = source.replace(
-    /Create a candidate section of a 20-item mock exam from only this source chunk\./g,
-    "Create a candidate section of a mock exam from only this source chunk."
+    /if \(\s*false\s*\|\|\s*false\s*\|\|\s*false\s*\|\|\s*false\s*\) \{/,n    "if (chosen.length < 1) {"
   );
-  source = source.replace(
-    /The full exam must contain exactly 10 multiple_choice, 5 true_false, 3 identification, and 2 short_answer questions\./g,
-    "The full exam size and type mix are defined by the EXACT QUOTA for this chunk. Only use the types listed in that quota (0 means skip that type)."
-  );
-  source = source.replace(
-    /Done\. Generated a 20-item mock exam with 10 multiple choice, 5 true\/false, 3 identification, and 2 short-answer questions\./g,
-    "Done. Generated the mock exam from your selected item count and question types."
-  );
-  source = source.replace(
-    /Answer all 20 questions\. Unanswered questions are scored as incorrect\./g,
-    "Answer all questions. Unanswered questions are scored as incorrect."
-  );
+
+  // Prompt / status copy
+  source = source.split("a 20-item mock exam").join("a mock exam");
+  source = source.split(
+    "exactly 10 multiple_choice, 5 true_false, 3 identification, and 2 short_answer questions"
+  ).join("the question counts listed in the EXACT QUOTA for this chunk");
+  source = source.split(
+    "Done. Generated a 20-item mock exam with 10 multiple choice, 5 true/false, 3 identification, and 2 short-answer questions."
+  ).join("Done. Generated the mock exam from your selected item count and question types.");
+  source = source.split("Answer all 20 questions.").join("Answer all questions.");
 
   return source;
 }
@@ -251,22 +227,17 @@ const CDN_APP =
 async function revdevLoadApp() {
   ensureCloudAiUi();
   wireItemCountControls();
-  const response = await fetch(CDN_APP);
+  const response = await fetch(CDN_APP + "?v=examfix4");
   if (!response.ok) throw new Error("Could not load RevDev application module.");
   let source = await response.text();
   source = patchExamConfig(source);
-  // Verify critical patches applied
-  if (source.indexOf("fewer than 20 unique") !== -1) {
-    console.warn("RevDev: 20-question validation patch may have missed; applying fallback strip.");
-    source = source.replace(
-      /The AI generated fewer than 20 unique source-backed exam questions\. Try generating again or use a smaller topic focus\./g,
-      "The AI could not generate unique source-backed exam questions. Try generating again or use a smaller topic focus."
-    );
-    source = source.replace(
-      /counts\.multiple_choice !== 10/g,
-      "false && counts.multiple_choice !== 10"
-    );
+
+  if (source.indexOf("counts.multiple_choice !== 10") !== -1) {
+    console.error("RevDev: failed to neutralize 20-question check");
+  } else {
+    console.info("RevDev: exam count validation patched (v4)");
   }
+
   const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
   await import(url);
   wireItemCountControls();
