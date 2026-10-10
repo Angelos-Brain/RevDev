@@ -1,8 +1,7 @@
-// RevDev bootstrap
+// RevDev bootstrap — configurable mock exam + Gemini free-tier fixes
 (function () {
   const originalFetch = window.fetch.bind(window);
   const GEMINI_FREE_MODEL = "gemini-3.5-flash-lite";
-
   function stripAdditionalProperties(value) {
     if (Array.isArray(value)) return value.map(stripAdditionalProperties);
     if (!value || typeof value !== "object") return value;
@@ -13,84 +12,57 @@
     });
     return cleaned;
   }
-
   function isRateLimitBody(body) {
     if (!body) return false;
     const text = JSON.stringify(body).toLowerCase();
-    return (
-      text.includes("resource_exhausted") ||
-      text.includes("rate limit") ||
-      text.includes("quota") ||
-      text.includes("limit reached") ||
-      text.includes("too many requests")
-    );
+    return text.includes("resource_exhausted") || text.includes("rate limit") || text.includes("quota") || text.includes("limit reached") || text.includes("too many requests");
   }
-
   function friendlyRateLimitMessage(provider) {
-    return (
-      "The " + provider +
-      " free-tier limit was reached for this project. " +
-      "Wait a few minutes (or until midnight Pacific for daily quotas), " +
-      "try a smaller file, or switch provider to Groq and use a free Groq key."
-    );
+    return "The " + provider + " free-tier limit was reached for this project. Wait a few minutes (or until midnight Pacific for daily quotas), try a smaller file, or switch provider to Groq and use a free Groq key.";
   }
-
   window.fetch = async function (url, options) {
-    var requestUrl = url;
-    var requestOptions = options;
-
+    var requestUrl = url, requestOptions = options;
     if (typeof requestUrl === "string" && requestUrl.includes("generativelanguage.googleapis.com")) {
       requestUrl = requestUrl.replace(/models\/[^:]+/, "models/" + encodeURIComponent(GEMINI_FREE_MODEL));
       if (requestOptions && typeof requestOptions.body === "string") {
         try {
           var body = JSON.parse(requestOptions.body);
           if (body.generationConfig && body.generationConfig.responseSchema) {
-            body.generationConfig.responseSchema = stripAdditionalProperties(
-              body.generationConfig.responseSchema
-            );
-            requestOptions = Object.assign({}, requestOptions, {
-              body: JSON.stringify(body)
-            });
+            body.generationConfig.responseSchema = stripAdditionalProperties(body.generationConfig.responseSchema);
+            requestOptions = Object.assign({}, requestOptions, { body: JSON.stringify(body) });
           }
         } catch (e) {}
       }
     }
-
     var response = await originalFetch(requestUrl, requestOptions);
-
     try {
       if (!response.ok && (response.status === 429 || response.status === 403)) {
         var cloned = response.clone();
         var errorBody = null;
-        try { errorBody = await cloned.json(); } catch (e) { errorBody = null; }
+        try { errorBody = await cloned.json(); } catch (e) {}
         if (response.status === 429 || isRateLimitBody(errorBody)) {
-          var provider = String(requestUrl).includes("generativelanguage.googleapis.com")
-            ? "Gemini"
-            : String(requestUrl).includes("api.groq.com")
-              ? "Groq"
-              : "AI provider";
-          return new Response(
-            JSON.stringify({
-              error: {
-                message: friendlyRateLimitMessage(provider),
-                status: "RESOURCE_EXHAUSTED",
-                code: 429
-              }
-            }),
-            {
-              status: 429,
-              statusText: "Too Many Requests",
-              headers: { "Content-Type": "application/json" }
-            }
-          );
+          var provider = String(requestUrl).includes("generativelanguage.googleapis.com") ? "Gemini" : String(requestUrl).includes("api.groq.com") ? "Groq" : "AI provider";
+          return new Response(JSON.stringify({ error: { message: friendlyRateLimitMessage(provider), status: "RESOURCE_EXHAUSTED", code: 429 } }), { status: 429, statusText: "Too Many Requests", headers: { "Content-Type": "application/json" } });
         }
       }
     } catch (e) {}
-
     return response;
   };
 })();
 
-await import(
-  "https://cdn.jsdelivr.net/gh/Angelos-Brain/RevDev@c151cf08a68250e6b1477b6f2c339246181b48f4/docs/app.js"
-);
+async function revdevLoadApp() {
+  const base = new URL("./", import.meta.url);
+  const parts = await Promise.all([0, 1, 2].map(function (i) {
+    return fetch(new URL("app.payload." + i + ".txt", base)).then(function (r) {
+      if (!r.ok) throw new Error("Missing app payload part " + i);
+      return r.text();
+    });
+  }));
+  const b64 = parts.join("").trim();
+  const binary = Uint8Array.from(atob(b64), function (c) { return c.charCodeAt(0); });
+  const stream = new Response(binary).body.pipeThrough(new DecompressionStream("gzip"));
+  const source = await new Response(stream).text();
+  const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
+  await import(url);
+}
+await revdevLoadApp();
