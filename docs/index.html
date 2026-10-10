@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="RevDev turns your study files into exam-ready review material.">
   <title>RevDev — Study File Reader</title>
-  <link rel="stylesheet" href="styles.css?v=ui5">
+  <link rel="stylesheet" href="styles.css?v=ui6">
   <script>
     (function(){try{var t=localStorage.getItem("revdev_theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();
   </script>
@@ -383,7 +383,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.2/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mammoth@1.13.0/mammoth.browser.min.js"></script>
-  <script type="module" src="./app.js?v=ui5"></script>
+  <script type="module" src="./app.js?v=ui6"></script>
 
   <script>
   (function(){
@@ -401,37 +401,40 @@
   })();
   </script>
 
+
   <script>
   (function () {
+    function qs(id) { return document.getElementById(id); }
+
     function updateStepper() {
       var items = document.querySelectorAll(".stepper-item");
       if (!items.length) return;
 
-      var statusEl = document.getElementById("status");
-      var statusText = (statusEl && statusEl.textContent || "").toLowerCase();
-      var fileList = document.getElementById("file-list");
-      var hasFiles = fileList && !fileList.classList.contains("empty-state") &&
-        fileList.querySelectorAll(".file-item").length > 0;
-      var filesReadable = /readable|finished|produced readable/i.test(statusText) ||
-        (fileList && fileList.querySelector(".file-state.ready"));
+      var statusText = (qs("status") && qs("status").textContent || "").toLowerCase();
+      var fileList = qs("file-list");
+      var fileHtml = fileList ? fileList.innerHTML.toLowerCase() : "";
+      var filesReadable =
+        /readable|finished|produced readable/.test(statusText) ||
+        /readable/.test(fileHtml) ||
+        (fileList && fileList.querySelector(".file-state.ready, .file-state"));
 
-      var keysStatus = document.getElementById("keys-status");
+      var hasFileItems = fileList && fileList.querySelectorAll(".file-item").length > 0;
+
+      var keysStatus = qs("keys-status");
       var keysText = (keysStatus && keysStatus.textContent || "").toLowerCase();
-      var hasKeys = /saved|gemini|groq/i.test(keysText) && !/no keys/i.test(keysText);
-      // Also check inputs
-      var g = document.getElementById("api-key-gemini");
-      var q = document.getElementById("api-key-groq");
-      if ((g && g.value.trim()) || (q && q.value.trim())) hasKeys = true;
+      var g = qs("api-key-gemini");
+      var q = qs("api-key-groq");
+      var hasKeys =
+        ((g && g.value.trim().length > 8) || (q && q.value.trim().length > 8)) ||
+        (/saved|gemini|groq/.test(keysText) && !/no keys/.test(keysText));
 
-      var genBtn = document.getElementById("generate-button");
-      var genReady = genBtn && !genBtn.disabled;
-      var genStatus = document.getElementById("generation-status");
+      var genStatus = qs("generation-status");
       var genText = (genStatus && genStatus.textContent || "").toLowerCase();
-      var generating = /generat|batch|filling/i.test(genText);
-      var genDone = /done\.|generated/i.test(genText);
+      var generating = /generat|batch|filling|pass /.test(genText);
+      var genDone = /done\.|generated \d/.test(genText);
 
       var step = 1;
-      if (filesReadable || (hasFiles && /finished|readable/i.test(statusText))) step = 2;
+      if (filesReadable || (hasFileItems && /finished|readable|success/.test(statusText))) step = 2;
       if (step >= 2 && hasKeys) step = 3;
       if (generating || genDone) step = 3;
 
@@ -443,22 +446,33 @@
       });
     }
 
-    // Observe DOM changes that reflect progress
-    var obs = new MutationObserver(function () { updateStepper(); });
-    ["status", "file-list", "keys-status", "generation-status", "generate-button"].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) obs.observe(el, { childList: true, subtree: true, characterData: true, attributes: true });
-    });
-    document.addEventListener("input", function (e) {
-      if (e.target && (e.target.id === "api-key-gemini" || e.target.id === "api-key-groq" || e.target.id === "api-key")) {
-        updateStepper();
-      }
-    });
-    document.addEventListener("change", function () { updateStepper(); });
-    // Initial + delayed passes for async UI updates
-    updateStepper();
-    setTimeout(updateStepper, 500);
-    setInterval(updateStepper, 1500);
+    function bind() {
+      updateStepper();
+      var targets = ["status", "file-list", "keys-status", "generation-status", "generate-button", "file-count"];
+      var obs = new MutationObserver(function () { updateStepper(); });
+      targets.forEach(function (id) {
+        var el = qs(id);
+        if (el) obs.observe(el, { childList: true, subtree: true, characterData: true, attributes: true });
+      });
+      document.addEventListener("click", function (e) {
+        var t = e.target;
+        if (!t) return;
+        if (t.id === "read-button" || t.id === "clear-button" || (t.closest && t.closest("#read-button"))) {
+          setTimeout(updateStepper, 200);
+          setTimeout(updateStepper, 800);
+          setTimeout(updateStepper, 2000);
+        }
+      });
+      document.addEventListener("input", updateStepper);
+      document.addEventListener("change", updateStepper);
+      setInterval(updateStepper, 1000);
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", bind);
+    } else {
+      bind();
+    }
   })();
   </script>
 
