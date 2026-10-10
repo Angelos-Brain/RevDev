@@ -1,1 +1,285 @@
-PLACEHOLDER_CSS
+/* RevDev UI fixes: progress bar + mock exam question headers */
+
+/* Progress track needs explicit height so the fill is visible */
+.progress {
+  height: 8px;
+}
+.progress-track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 6px;
+  border-radius: inherit;
+  overflow: hidden;
+}
+#progress-fill,
+.progress-fill {
+  height: 100%;
+  min-height: 6px;
+}
+.progress-fill.is-success {
+  background: linear-gradient(90deg, var(--success), #34d399);
+}
+.progress-fill.is-warning {
+  background: linear-gradient(90deg, var(--warning), #fbbf24);
+}
+.progress-fill.is-error {
+  background: linear-gradient(90deg, var(--danger), #f87171);
+}
+.progress-fill.is-indeterminate {
+  background-size: 200% 100%;
+  animation: revdev-progress-shimmer 1.2s linear infinite;
+}
+@keyframes revdev-progress-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress-fill.is-indeterminate { animation: none; }
+}
+
+.exam-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.exam-question {
+  display: block;
+  margin: 0;
+  min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius, 14px);
+  background: var(--surface-2);
+  box-sizing: border-box;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.exam-question > legend {
+  float: left;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.45;
+}
+
+.exam-question > legend + *,
+.exam-question::after {
+  clear: both;
+}
+.exam-question::after {
+  content: "";
+  display: table;
+}
+
+.exam-question .question-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  height: 1.75rem;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.exam-question .question-type {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 4px 10px;
+  border-radius: var(--radius-full, 999px);
+  background: var(--primary-soft);
+  color: var(--primary-text);
+  text-transform: capitalize;
+  flex-shrink: 0;
+}
+
+.exam-question .question-text {
+  display: block;
+  width: 100%;
+  flex: 1 0 100%;
+  font-weight: 600;
+  margin: 10px 0 0;
+  padding: 0;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.exam-question .question-options,
+.exam-question .answer-input {
+  margin-top: 14px;
+  clear: both;
+}
+
+@media print {
+  .exam-question {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .exam-question > legend {
+    float: left;
+    width: 100%;
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 10px;
+  }
+  .exam-question .question-text {
+    display: block !important;
+    flex: 1 0 100%;
+  }
+  .exam-question .question-number {
+    background: #333 !important;
+    color: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .exam-question .question-type {
+    border: 1px solid #999;
+    background: #eee !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+.exam-question .question-options,
+.exam-question .answer-input,
+.exam-question .choice-option {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+}
+.exam-question .choice-option {
+  cursor: pointer;
+}
+.exam-question .choice-option.selected,
+.exam-question .choice-option:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.exam-question .choice-option input[type="radio"] {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* Review: explanation block + status badge + correct-answer marks */
+.exam-inline-result,
+.exam-explanation {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm, 10px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+.exam-inline-result .exp-label,
+.exam-explanation .exp-label {
+  font-weight: 700;
+  color: var(--text);
+  margin-right: 0.25em;
+}
+.exam-inline-result .exp-text,
+.exam-explanation .exp-text {
+  color: var(--text-secondary);
+}
+
+.review-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full, 999px);
+  font-size: 0.75rem;
+  font-weight: 700;
+  width: fit-content;
+  clear: both;
+}
+.review-status.is-correct {
+  background: var(--success-soft);
+  color: var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
+}
+.review-status.is-incorrect {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+}
+.review-status.is-unanswered {
+  background: var(--warning-soft);
+  color: var(--warning);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+}
+.review-status.is-no-key {
+  background: var(--surface-2);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+.review-status-icon {
+  font-weight: 900;
+  line-height: 1;
+}
+
+.choice-option .result-mark {
+  margin-left: auto;
+  font-weight: 900;
+  font-size: 0.95rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.choice-option .result-mark-check { color: var(--success); }
+.choice-option .result-mark-cross { color: var(--danger); }
+
+.exam-question .choice-option {
+  grid-template-columns: 18px 28px minmax(0, 1fr) auto;
+}
+
+.review-answer-line {
+  margin-top: 12px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.review-correct-answer {
+  color: var(--success);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.review-user-wrong {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+@media print {
+  .review-status,
+  .choice-option .result-mark,
+  .review-correct-answer,
+  .review-user-wrong {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .exam-inline-result,
+  .exam-explanation {
+    margin-top: 12px;
+    border: 1px solid #999;
+  }
+}
