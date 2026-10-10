@@ -83,7 +83,7 @@
   border-radius: var(--radius-full, 999px);
   background: var(--primary-soft);
   color: var(--primary-text);
-  text-transform: none;
+  text-transform: capitalize;
   flex-shrink: 0;
 }
 .exam-question .question-text {
