@@ -1,4 +1,4 @@
-/* RevDev loader: dual-key app from backup + count/render sync + selection + review fixes */
+/* RevDev loader: dual-key app from backup + count/render sync + selection + review + retake fixes */
 const src = await fetch("https://cdn.jsdelivr.net/gh/Angelos-Brain/RevDev@backup-before-grok-2026-10-10/docs/app.js");
 if (!src.ok) throw new Error("Failed to load RevDev app.js from backup");
 const code = await src.text();
@@ -152,6 +152,7 @@ await import(blobUrl);
   }
 
   function renderExam(items) {
+    window.__revdevRenderExamClean = renderExam;
     var form = qs("exam-form");
     var count = qs("exam-count");
     var out = qs("exam-output");
@@ -274,6 +275,7 @@ await import(blobUrl);
   observer.observe(statusEl, { childList: true, characterData: true, subtree: true });
   var existingForm = qs("exam-form");
   if (existingForm) bindFormOnce(existingForm);
+  window.__revdevRenderExamClean = renderExam;
   console.info("RevDev: count/render sync + selection fix armed");
 })();
 
@@ -429,4 +431,119 @@ await import(blobUrl);
   setTimeout(install, 500);
   setTimeout(install, 2000);
   console.info("RevDev: exam review mark/explanation fix armed");
+})();
+
+/* Retake: full clean rebuild from the original items array (no AI call). */
+(function fixExamRetake() {
+  function qs(id) { return document.getElementById(id); }
+
+  function getItems() {
+    var job = window.__revdevJob;
+    if (job && Array.isArray(job.collected) && job.collected.length) return job.collected;
+    var last = window.__revdevLastResult;
+    if (last && Array.isArray(last.items) && last.items.length) return last.items;
+    return [];
+  }
+
+  function clearResultsUi() {
+    var results = qs("exam-results");
+    var answerReview = qs("answer-review");
+    var weakTopics = qs("weak-topics");
+    var scoreEl = qs("exam-score");
+    var percentEl = qs("exam-percent");
+    if (results) results.hidden = true;
+    if (answerReview) answerReview.innerHTML = "";
+    if (weakTopics) weakTopics.innerHTML = "";
+    if (scoreEl) scoreEl.textContent = "0 / 0";
+    if (percentEl) percentEl.textContent = "0%";
+  }
+
+  function resetButtons() {
+    var submitBtn = qs("submit-exam");
+    var retakeBtn = qs("retake-exam");
+    if (submitBtn) {
+      submitBtn.hidden = false;
+      submitBtn.disabled = false;
+    }
+    if (retakeBtn) retakeBtn.hidden = true;
+  }
+
+  function updateAnsweredZero(n) {
+    var el = qs("answered-count");
+    if (el) el.textContent = "Answered 0 of " + n;
+  }
+
+  function rebuildCleanExam() {
+    var items = getItems();
+    if (!items.length) {
+      console.warn("RevDev: retake has no stored questions");
+      return;
+    }
+    if (typeof window.__revdevRenderExamClean === "function") {
+      window.__revdevRenderExamClean(items);
+    } else {
+      var form = qs("exam-form");
+      if (!form) return;
+      form.querySelectorAll(".exam-question").forEach(function (fs) {
+        fs.classList.remove("is-correct", "is-incorrect", "is-unanswered", "is-no-key");
+        fs.querySelectorAll(".choice-option").forEach(function (opt) {
+          opt.classList.remove(
+            "is-correct", "is-user-correct", "is-user-wrong",
+            "is-right-answer", "is-correct-answer", "selected"
+          );
+        });
+        fs.querySelectorAll(
+          ".review-status, .result-mark, .exam-inline-result, .exam-explanation, " +
+          ".explanation-box, .answer-feedback, .review-answer-line"
+        ).forEach(function (node) { node.remove(); });
+        fs.querySelectorAll("input, textarea, select").forEach(function (el) {
+          el.disabled = false;
+          if (el.type === "radio" || el.type === "checkbox") el.checked = false;
+          else el.value = "";
+        });
+      });
+    }
+    clearResultsUi();
+    resetButtons();
+    updateAnsweredZero(items.length);
+    var form = qs("exam-form");
+    var out = qs("exam-output");
+    if (out) out.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (form) {
+      var first = form.querySelector('input[type="radio"], input[type="text"]');
+      if (first) {
+        try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); }
+      }
+    }
+  }
+
+  function bindRetake() {
+    var retakeBtn = qs("retake-exam");
+    if (!retakeBtn) return;
+    var fresh = retakeBtn.cloneNode(true);
+    retakeBtn.parentNode.replaceChild(fresh, retakeBtn);
+    fresh.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      rebuildCleanExam();
+    });
+  }
+
+  bindRetake();
+  setTimeout(bindRetake, 500);
+  setTimeout(bindRetake, 2000);
+
+  var actions = document.querySelector(".exam-actions");
+  if (actions) {
+    var mo = new MutationObserver(function () {
+      var btn = qs("retake-exam");
+      if (btn && !btn.hidden && !btn.__revdevRetakeV2) {
+        btn.__revdevRetakeV2 = true;
+        bindRetake();
+      }
+    });
+    mo.observe(actions, { attributes: true, subtree: true, attributeFilter: ["hidden"] });
+  }
+
+  console.info("RevDev: exam retake full-reset armed");
 })();
