@@ -1,21 +1,27 @@
-/* Patch: forceGrade must use full markForm (Per question = Total time review). */
+/* Patch: forceGrade must use full markForm (Per question = Total time review).
+   Uses committed array only; syncFromDom before grade. */
 (function () {
   "use strict";
 
+  function getCommittedItems() {
+    if (Array.isArray(window.__revdevFinalExamItems) && window.__revdevFinalExamItems.length) {
+      return window.__revdevFinalExamItems;
+    }
+    if (Array.isArray(window.__revdevPristineExamItems) && window.__revdevPristineExamItems.length) {
+      return window.__revdevPristineExamItems;
+    }
+    if (window.__revdevJob && Array.isArray(window.__revdevJob.collected) && window.__revdevJob.collected.length) {
+      return window.__revdevJob.collected;
+    }
+    if (window.__revdevLastResult && Array.isArray(window.__revdevLastResult.items) && window.__revdevLastResult.items.length) {
+      return window.__revdevLastResult.items;
+    }
+    return [];
+  }
+
   function buildOutcomes() {
     var form = document.getElementById("exam-form");
-    var items = [];
-    if (Array.isArray(window.__revdevTimerExamItems) && window.__revdevTimerExamItems.length) {
-      items = window.__revdevTimerExamItems;
-    } else if (Array.isArray(window.__revdevFinalExamItems) && window.__revdevFinalExamItems.length) {
-      items = window.__revdevFinalExamItems;
-    } else if (Array.isArray(window.__revdevPristineExamItems) && window.__revdevPristineExamItems.length) {
-      items = window.__revdevPristineExamItems;
-    } else if (window.__revdevJob && Array.isArray(window.__revdevJob.collected)) {
-      items = window.__revdevJob.collected;
-    } else if (window.__revdevLastResult && Array.isArray(window.__revdevLastResult.items)) {
-      items = window.__revdevLastResult.items;
-    }
+    var items = getCommittedItems();
 
     var results = {};
     try {
@@ -45,16 +51,6 @@
         }
       }
       var q = items[i] || {};
-      if ((!q.options || !q.options.length) && form) {
-        var fs = form.querySelectorAll(".exam-question")[i];
-        if (fs) {
-          var domOpts = [];
-          fs.querySelectorAll('input[type="radio"]').forEach(function (rad) {
-            domOpts.push(rad.value);
-          });
-          if (domOpts.length) q = Object.assign({}, q, { options: domOpts });
-        }
-      }
       outcomes.push({
         question: q,
         userAnswer: ans,
@@ -73,16 +69,17 @@
       fs.style.display = "";
       fs.classList.remove("is-active");
     });
+
+    if (typeof window.__revdevSyncFromDom === "function") {
+      try {
+        window.__revdevSyncFromDom();
+      } catch (e) {}
+    }
+
     var outcomes = buildOutcomes();
     if (!outcomes.length) {
       console.warn("[RevDev] force-full-grade: no outcomes");
       return;
-    }
-    if (Array.isArray(window.__revdevTimerExamItems) === false || !window.__revdevTimerExamItems.length) {
-      var items = outcomes.map(function (o) { return o.question; });
-      if (items.some(function (q) { return q && (q.options || q.answers || q.question); })) {
-        window.__revdevTimerExamItems = items;
-      }
     }
     var raw = window.__revdevMarkExamFormRaw;
     if (typeof raw === "function") {
@@ -100,6 +97,11 @@
     if (!raw || raw.__revdevFullGradeWrapped) return;
     window.__revdevMarkExamFormRaw = raw;
     var wrapped = function (outcomes) {
+      if (typeof window.__revdevSyncFromDom === "function") {
+        try {
+          window.__revdevSyncFromDom();
+        } catch (e) {}
+      }
       if (!outcomes || !outcomes.length) {
         outcomes = buildOutcomes();
       }
@@ -132,5 +134,5 @@
   setTimeout(wrapMark, 500);
   setTimeout(wrapMark, 2000);
 
-  console.info("RevDev: force-full-grade armed (Per question uses shared markForm)");
+  console.info("RevDev: force-full-grade armed (committed items only + syncFromDom)");
 })();

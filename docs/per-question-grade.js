@@ -1,30 +1,31 @@
-/* Per-question finish → grade via shared markForm (same as Total time). */
+/* Per-question finish → grade via shared markForm (same as Total time).
+   Uses committed array only; never keeps a stale timer snapshot across exams. */
 (function () {
   "use strict";
 
   function getItems() {
-    var lists = [];
-    if (Array.isArray(window.__revdevTimerExamItems) && window.__revdevTimerExamItems.length) {
-      lists.push(window.__revdevTimerExamItems);
-    }
+    // Prefer the single committed array
     if (Array.isArray(window.__revdevFinalExamItems) && window.__revdevFinalExamItems.length) {
-      lists.push(window.__revdevFinalExamItems);
+      return window.__revdevFinalExamItems;
     }
     if (Array.isArray(window.__revdevPristineExamItems) && window.__revdevPristineExamItems.length) {
-      lists.push(window.__revdevPristineExamItems);
+      return window.__revdevPristineExamItems;
     }
     if (window.__revdevJob && Array.isArray(window.__revdevJob.collected) && window.__revdevJob.collected.length) {
-      lists.push(window.__revdevJob.collected);
+      return window.__revdevJob.collected;
     }
     if (window.__revdevLastResult && Array.isArray(window.__revdevLastResult.items) && window.__revdevLastResult.items.length) {
-      lists.push(window.__revdevLastResult.items);
+      return window.__revdevLastResult.items;
     }
-    var form = document.getElementById("exam-form");
-    var n = form ? form.querySelectorAll(".exam-question").length : 0;
-    for (var i = 0; i < lists.length; i++) {
-      if (n && lists[i].length === n) return lists[i];
+    // Timer list only if it is the same reference as committed (set by commitExam)
+    if (
+      Array.isArray(window.__revdevTimerExamItems) &&
+      window.__revdevTimerExamItems.length &&
+      window.__revdevTimerExamItems === window.__revdevFinalExamItems
+    ) {
+      return window.__revdevTimerExamItems;
     }
-    return lists[0] || [];
+    return [];
   }
 
   function buildOutcomes() {
@@ -58,16 +59,6 @@
         }
       }
       var q = items[i] || {};
-      if ((!q.options || !q.options.length) && form) {
-        var fs = form.querySelectorAll(".exam-question")[i];
-        if (fs) {
-          var domOpts = [];
-          fs.querySelectorAll('input[type="radio"]').forEach(function (rad) {
-            domOpts.push(rad.value);
-          });
-          if (domOpts.length) q = Object.assign({}, q, { options: domOpts });
-        }
-      }
       outcomes.push({
         question: q,
         userAnswer: ans,
@@ -90,13 +81,14 @@
 
   function tryGrade() {
     showAllQuestions();
-    var items = getItems();
-    if (items.length) window.__revdevTimerExamItems = items.slice();
+    if (typeof window.__revdevSyncFromDom === "function") {
+      try {
+        window.__revdevSyncFromDom();
+      } catch (e) {}
+    }
 
     var outcomes = buildOutcomes();
-    var mark =
-      window.__revdevMarkExamFormRaw ||
-      window.__revdevMarkExamForm;
+    var mark = window.__revdevMarkExamFormRaw || window.__revdevMarkExamForm;
     if (typeof mark === "function") {
       try {
         mark(outcomes.length ? outcomes : undefined);
@@ -117,11 +109,6 @@
         }
       }
     }, 100);
-  }
-
-  function snapshotItems() {
-    var items = getItems();
-    if (items.length) window.__revdevTimerExamItems = items.slice();
   }
 
   function watch() {
@@ -147,7 +134,6 @@
           t.id === "exam-timer-next" ||
           (t.closest && t.closest("#exam-timer-next"))
         ) {
-          snapshotItems();
           setTimeout(function () {
             var r = document.getElementById("exam-results");
             if (r && !r.hidden) tryGrade();
@@ -160,15 +146,6 @@
       },
       true
     );
-
-    var out = document.getElementById("exam-output");
-    if (out && window.MutationObserver) {
-      new MutationObserver(function () {
-        snapshotItems();
-      }).observe(out, { childList: true, subtree: true });
-    }
-
-    setInterval(snapshotItems, 2000);
   }
 
   if (document.readyState === "loading") {
