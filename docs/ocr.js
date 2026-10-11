@@ -107,7 +107,7 @@
       "</label>" +
       '<label class="ocr-engine-option">' +
       '<input type="radio" name="ocr-engine" value="gemini" id="ocr-engine-gemini">' +
-      "<span>Gemini Vision: often clearer; uses your Gemini key &amp; quota</span>" +
+      "<span>Gemini Vision: often clearer; uses your Gemini key &amp; quota (auto-falls back to Local on error)</span>" +
       "</label>" +
       "</fieldset>" +
       "</div>" +
@@ -412,14 +412,26 @@
   }
 
   async function ocrCanvasLocal(Tesseract, canvas, lang, onProgress) {
-    var result = await Tesseract.recognize(canvas, lang, {
-      logger: function (m) {
-        if (m && m.status === "recognizing text" && typeof m.progress === "number" && onProgress) {
-          onProgress(m.progress);
-        }
+    // QoS: retry local OCR once on transient worker failures
+    var attempt = 0;
+    var lastErr = null;
+    while (attempt < 2) {
+      attempt++;
+      try {
+        var result = await Tesseract.recognize(canvas, lang, {
+          logger: function (m) {
+            if (m && m.status === "recognizing text" && typeof m.progress === "number" && onProgress) {
+              onProgress(m.progress);
+            }
+          }
+        });
+        return (result && result.data && result.data.text) || "";
+      } catch (err) {
+        lastErr = err;
+        if (attempt >= 2) break;
       }
-    });
-    return (result && result.data && result.data.text) || "";
+    }
+    throw lastErr || new Error("Local OCR failed");
   }
 
   function canvasToJpegBase64(canvas, quality, maxDim) {

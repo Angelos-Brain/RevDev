@@ -1,4 +1,4 @@
-/* RevDev loader: known-good UI patches + hard quality + exam timer + review fix + session persist */
+/* RevDev loader: known-good app + quality + timer + review + session + OCR */
 const res = await fetch(
   "https://raw.githubusercontent.com/Angelos-Brain/RevDev/ffb7eef/docs/app.js"
 );
@@ -7,8 +7,8 @@ const code = await res.text();
 const blobUrl = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
 await import(blobUrl);
 
-await import("./hard-quality.js?v=hq11");
-await import("./exam-timer.js?v=t14");
-await import("./review-fix.js?v=rf8");
-await import("./session-persist.js?v=sp8");
-await import("./ocr.js?v=ocr7");
+await import("./hard-quality.js?v=hq12");
+await import("./exam-timer.js?v=t15");
+await import("./review-fix.js?v=rf9");
+await import("./session-persist.js?v=sp9");
+await import("./ocr.js?v=ocr8");
