@@ -1,8 +1,11 @@
 /* ============================================================
    HARD exam quality: prompt rules + blocklist + near-dup filter
-   + randomized correct-answer positions (no all-A pattern)
+   + source-text cleaning + post-filter top-up to requested count
+   + randomized correct-answer positions
    ============================================================ */
 (function installHardQuestionQuality() {
+  "use strict";
+
   var BLOCKLIST = [
     "according to",
     "the text",
@@ -45,7 +48,7 @@
     "  according to, the text, the passage, the document, the file(s), course files, the material(s),",
     "  study guide, the guide, the author, the slides, uploaded, provided, chapter, section, appendix,",
     "  table of contents, page, glossary, review questions, bibliography, preface.",
-    "- Ignore front/back matter (TOC, preface, how-to-use, citations, appendices, glossary listings).",
+    "- Ignore front/back matter (TOC, preface, how-to-use, citations, appendices, glossary listings, reference lists).",
     "- Never ask about layout, order of sections, or what the document contains.",
     "",
     "DIFFICULTY RULES (MUST):",
@@ -66,6 +69,67 @@
     "- Short answer: 1–3 sentences of reasoning; include key points a correct answer must contain.",
     "- Explanations: why the answer is right and why the strongest wrong option is wrong. Never mention the source."
   ].join("\n");
+
+  /* ---------- Source text cleaning (preview left untouched) ---------- */
+  function isTocLine(line) {
+    var t = String(line || "");
+    // dotted leaders + page number: "2.4 Network-Bound Workloads ........ 7"
+    if (/\.{4,}\s*\d+\s*$/.test(t)) return true;
+    if (/\u2026{2,}|\.{3,}\s*\d+\s*$/.test(t)) return true;
+    // "Chapter 3 - Metrics ........ 9"
+    if (/^\s*chapter\s+\d+/i.test(t) && /\d+\s*$/.test(t) && t.length < 120) return true;
+    return false;
+  }
+
+  function isPageHeaderLine(line) {
+    var t = String(line || "").trim();
+    if (/^study\s+guide\s+page\s+\d+/i.test(t)) return true;
+    if (/^page\s+\d+\s+of\s+\d+/i.test(t)) return true;
+    if (/^\d+\s+of\s+\d+$/i.test(t)) return true;
+    return false;
+  }
+
+  function isBibliographyBlockStart(line) {
+    var t = String(line || "").trim().toLowerCase();
+    return /^(references|bibliography|works cited|reference list|further reading)\s*$/.test(t);
+  }
+
+  function cleanSourceText(raw) {
+    var text = String(raw || "");
+    if (!text) return text;
+    var lines = text.split(/\r?\n/);
+    var out = [];
+    var inBib = false;
+    var dropped = 0;
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (isBibliographyBlockStart(line)) {
+        inBib = true;
+        dropped++;
+        continue;
+      }
+      // End bibliography if we hit a clear new major heading that is not a ref line
+      if (inBib) {
+        if (/^\s*chapter\s+\d+/i.test(line) || /^\s*\d+\.\d+\s+\S/.test(line)) {
+          inBib = false;
+        } else {
+          dropped++;
+          continue;
+        }
+      }
+      if (isTocLine(line) || isPageHeaderLine(line)) {
+        dropped++;
+        continue;
+      }
+      out.push(line);
+    }
+    if (dropped > 0) {
+      console.info("[RevDev] cleanSourceText removed " + dropped + " structural line(s)");
+    }
+    return out.join("\n");
+  }
+
+  window.__revdevCleanSourceText = cleanSourceText;
 
   function textHitsBlocklist(s) {
     var t = String(s || "").toLowerCase();
@@ -155,12 +219,17 @@
     return String(s || "").trim().toLowerCase();
   }
 
-  /** Fisher–Yates shuffle of MC/TF options; answers stay as text so grading still works. */
+  function dropReason(q, accepted) {
+    if (!q) return "empty";
+    if (questionFailsBlocklist(q)) return "blocklist";
+    if (isNearDuplicate(q, accepted)) return "duplicate";
+    return null;
+  }
+
   function shuffleQuestionOptions(q) {
     if (!q || !Array.isArray(q.options) || q.options.length < 2) return q;
     var type = String(q.type || "").toLowerCase().replace(/\s+/g, "_");
     if (type !== "multiple_choice" && type !== "true_false") return q;
-
     var opts = q.options.slice();
     for (var i = opts.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1));
@@ -172,10 +241,6 @@
     return q;
   }
 
-  /**
-   * Re-shuffle items still stuck with correct answer at position 0
-   * so the exam is not heavily skewed toward A.
-   */
   function balanceCorrectPositions(items) {
     if (!Array.isArray(items) || !items.length) return items;
     var mc = [];
@@ -186,11 +251,7 @@
       }
     });
     if (mc.length < 2) return items;
-
-    mc.forEach(function (idx) {
-      shuffleQuestionOptions(items[idx]);
-    });
-
+    mc.forEach(function (idx) { shuffleQuestionOptions(items[idx]); });
     function correctIndex(q) {
       var answers = (q.answers || []).map(normalizeAnswerKey).filter(Boolean);
       if (!answers.length) return -1;
@@ -198,13 +259,10 @@
         if (answers.indexOf(normalizeAnswerKey(q.options[i])) !== -1) return i;
       }
       for (var a = 0; a < answers.length; a++) {
-        if (/^[a-d]$/.test(answers[a])) {
-          return answers[a].charCodeAt(0) - 97;
-        }
+        if (/^[a-d]$/.test(answers[a])) return answers[a].charCodeAt(0) - 97;
       }
       return -1;
     }
-
     var atZero = 0;
     mc.forEach(function (idx) {
       if (correctIndex(items[idx]) === 0) atZero++;
@@ -225,21 +283,212 @@
   function filterItems(items) {
     var out = [];
     var rejected = 0;
-    (items || []).forEach(function (q) {
-      if (questionFailsBlocklist(q)) {
+    var log = [];
+    (items || []).forEach(function (q, i) {
+      var reason = dropReason(q, out);
+      if (reason) {
         rejected++;
-        return;
-      }
-      if (isNearDuplicate(q, out)) {
-        rejected++;
+        log.push({
+          index: i,
+          reason: reason,
+          question: String((q && (q.question || q.front || q.topic)) || "").slice(0, 120)
+        });
         return;
       }
       out.push(q);
     });
-    // Randomize option order so correct answers are not always A
     out.forEach(function (q) { shuffleQuestionOptions(q); });
     balanceCorrectPositions(out);
-    return { items: out, rejected: rejected };
+    if (log.length) {
+      console.info("[RevDev] filter dropped " + log.length + " item(s):", log);
+    }
+    window.__revdevLastFilterLog = log;
+    return { items: out, rejected: rejected, log: log };
+  }
+
+  function publishFinal(items) {
+    var list = (items || []).map(function (q) {
+      return {
+        type: q.type,
+        question: q.question,
+        options: Array.isArray(q.options) ? q.options.slice() : q.options,
+        answers: Array.isArray(q.answers) ? q.answers.slice() : q.answers,
+        explanation: q.explanation,
+        front: q.front,
+        back: q.back,
+        topic: q.topic
+      };
+    });
+    window.__revdevFinalExamItems = list;
+    window.__revdevPristineExamItems = list;
+    if (window.__revdevJob) window.__revdevJob.collected = list;
+    if (window.__revdevLastResult) window.__revdevLastResult.items = list;
+    if (typeof window.__revdevPublishFinalItems === "function") {
+      try { window.__revdevPublishFinalItems(list); } catch (e) {}
+    }
+    return list;
+  }
+
+  function setStatus(msg, kind) {
+    var el = document.getElementById("generation-status");
+    if (!el) return;
+    el.textContent = msg || "";
+    el.className = "status-message" + (kind ? " " + kind : "");
+  }
+
+  function ensureMissingButton(missing) {
+    var row =
+      document.querySelector(".generate-card .action-row") ||
+      (document.getElementById("generate-button") &&
+        document.getElementById("generate-button").parentNode);
+    if (!row) return;
+    var btn = document.getElementById("generate-missing");
+    if (missing <= 0) {
+      if (btn) btn.hidden = true;
+      return;
+    }
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.id = "generate-missing";
+      btn.type = "button";
+      btn.className = "button secondary";
+      btn.style.marginLeft = "8px";
+      row.appendChild(btn);
+      btn.addEventListener("click", function () {
+        var gen = document.getElementById("generate-button");
+        if (gen && !gen.disabled) gen.click();
+      });
+    }
+    btn.hidden = false;
+    btn.textContent = "Generate missing " + missing;
+  }
+
+  function syncExamUI(items, requested) {
+    var n = items.length;
+    var countEl = document.getElementById("exam-count");
+    if (countEl) countEl.textContent = n + " questions";
+    if (typeof window.__revdevRenderExamClean === "function") {
+      try { window.__revdevRenderExamClean(items); } catch (e) {}
+    }
+    var provider = (window.__revdevJob && window.__revdevJob.provider === "groq") ? "Groq" : "Gemini";
+    if (n >= requested && requested > 0) {
+      setStatus("Done. Generated " + n + " item(s) using " + provider + ".", "success");
+      ensureMissingButton(0);
+    } else if (n > 0) {
+      setStatus("Generated " + n + " of " + requested + " requested.", "error");
+      ensureMissingButton(Math.max(0, requested - n));
+    }
+    if (typeof window.__revdevAssertCountsMatch === "function") {
+      try { window.__revdevAssertCountsMatch(); } catch (e) {}
+    }
+  }
+
+  /* ---------- Top-up after quality filter ---------- */
+  var toppingUp = false;
+
+  async function topUpToRequested(requested) {
+    if (toppingUp) return;
+    var job = window.__revdevJob;
+    if (!job || job.mode !== "exam") return;
+    var items = (job.collected || []).slice();
+    if (items.length >= requested) return;
+
+    toppingUp = true;
+    window.__revdevExamReady = false;
+    try {
+      var rounds = 0;
+      while (items.length < requested && rounds < 3) {
+        rounds++;
+        var missing = requested - items.length;
+        var ask = Math.min(requested, Math.ceil(missing * 1.2) || missing);
+        setStatus(
+          "Top-up round " + rounds + ": generating " + ask + " more (have " + items.length + "/" + requested + ")…",
+          ""
+        );
+        var avoid = items.map(function (q) {
+          return String(q.question || "").trim();
+        }).filter(Boolean).slice(-40);
+
+        var cleaned = cleanSourceText(job.sourceText || window.__revdevExtractedText || "");
+        var dist = null;
+        if (typeof window.__revdevDistributeTypes === "function") {
+          try { dist = window.__revdevDistributeTypes(ask, job.types); } catch (e) {}
+        }
+        var prompt = [
+          "Create exactly the exam questions requested below from ONLY this source text.",
+          dist ? "QUOTA for this batch: " + JSON.stringify(dist) : "Create exactly " + ask + " questions.",
+          "Use type values: multiple_choice, true_false, identification, short_answer.",
+          "For multiple_choice: exactly 4 options and 1 correct answer.",
+          "For true_false: options True and False, 1 correct answer.",
+          "For identification/short_answer: options empty array, answers with acceptable answers.",
+          "Every question must be answerable from the source. Include a short explanation.",
+          avoid.length ? "Do NOT repeat any of these existing questions: " + JSON.stringify(avoid) : "",
+          "",
+          "SOURCE:",
+          cleaned || job.sourceText || ""
+        ].join("\n");
+
+        var schema = {
+          type: "object",
+          additionalProperties: false,
+          required: ["questions"],
+          properties: {
+            questions: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["type", "question", "options", "answers", "explanation"],
+                properties: {
+                  type: { type: "string" },
+                  topic: { type: "string" },
+                  question: { type: "string" },
+                  options: { type: "array", items: { type: "string" } },
+                  answers: { type: "array", items: { type: "string" } },
+                  explanation: { type: "string" }
+                }
+              }
+            }
+          }
+        };
+
+        if (typeof window.__revdevRunBatch !== "function") break;
+        var result;
+        try {
+          result = await window.__revdevRunBatch(
+            prompt,
+            schema,
+            "Write HARD university-exam questions on the subject only. Never mention documents, chapters, guides, files, or materials.",
+            job.provider,
+            function (msg) { setStatus(msg, ""); }
+          );
+        } catch (err) {
+          console.error("[RevDev] top-up failed", err);
+          break;
+        }
+        var fresh = (result && result.data && result.data.questions) || [];
+        // filterItems already applied inside wrapped runBatch, but filter again against accepted
+        var filtered = filterItems(fresh);
+        filtered.items.forEach(function (q) {
+          var key = String(q.question || "").trim().toLowerCase();
+          if (!key) return;
+          if (job.seen && job.seen.has && job.seen.has(key)) return;
+          if (isNearDuplicate(q, items)) return;
+          if (job.seen && job.seen.add) job.seen.add(key);
+          items.push(q);
+        });
+        if (result && result.provider) job.provider = result.provider;
+      }
+
+      // Trim to requested
+      if (items.length > requested) items = items.slice(0, requested);
+      job.collected = items;
+      publishFinal(items);
+      syncExamUI(items, requested);
+    } finally {
+      toppingUp = false;
+      window.__revdevExamReady = true;
+    }
   }
 
   function applyFilterToJob() {
@@ -251,7 +500,6 @@
     if (!items || !items.length) return null;
 
     var result = filterItems(items);
-    // Always apply shuffled order back to job state and re-render so UI matches
     if (job) {
       job.collected = result.items;
       if (job.seen && typeof job.seen.clear === "function") {
@@ -265,23 +513,22 @@
       }
     }
     if (last) last.items = result.items;
-    window.__revdevPristineExamItems = result.items.map(function (q) {
-      return {
-        type: q.type,
-        question: q.question,
-        options: Array.isArray(q.options) ? q.options.slice() : q.options,
-        answers: Array.isArray(q.answers) ? q.answers.slice() : q.answers,
-        explanation: q.explanation,
-        front: q.front,
-        back: q.back,
-        topic: q.topic
-      };
-    });
+    publishFinal(result.items);
 
     var mode = (job && job.mode) || (last && last.mode) || "exam";
     if (typeof window.__revdevRenderExamClean === "function" && mode === "exam") {
       try { window.__revdevRenderExamClean(result.items); } catch (e) {}
     }
+
+    var requested = (job && job.totalWanted) || result.items.length;
+    if (mode === "exam" && result.items.length < requested && result.rejected > 0) {
+      // Kick off top-up asynchronously
+      topUpToRequested(requested);
+    } else if (mode === "exam") {
+      syncExamUI(result.items, requested);
+      window.__revdevExamReady = true;
+    }
+
     return result;
   }
 
@@ -293,6 +540,29 @@
       var p = String(prompt || "");
       var isStudy =
         /exam questions|QUOTA|multiple_choice|flashcards|topic review|summary/i.test(p);
+
+      // Clean SOURCE: section in the prompt
+      if (isStudy && /SOURCE:/i.test(p)) {
+        var parts = p.split(/SOURCE:/i);
+        if (parts.length >= 2) {
+          var head = parts[0];
+          var body = parts.slice(1).join("SOURCE:");
+          body = cleanSourceText(body);
+          p = head + "SOURCE:\n" + body;
+        }
+      }
+
+      // Also clean job.sourceText once
+      if (window.__revdevJob && window.__revdevJob.sourceText && !window.__revdevJob.__sourceCleaned) {
+        window.__revdevJob.sourceText = cleanSourceText(window.__revdevJob.sourceText);
+        window.__revdevJob.__sourceCleaned = true;
+      }
+      if (window.__revdevExtractedText && !window.__revdevExtractedCleaned) {
+        // keep original for preview; store cleaned separately for generation
+        window.__revdevExtractedTextClean = cleanSourceText(window.__revdevExtractedText);
+        window.__revdevExtractedCleaned = true;
+      }
+
       if (isStudy) {
         p = QUALITY_RULES + "\n\n" + p;
         var job = window.__revdevJob;
@@ -311,7 +581,8 @@
         " Write HARD university-exam questions on the subject only. " +
         "Never mention documents, chapters, guides, files, or materials. " +
         "No near-duplicate questions. Wrong options must be plausible domain misconceptions. " +
-        "Randomize correct-answer positions across A/B/C/D — never all A.";
+        "Randomize correct-answer positions across A/B/C/D — never all A. " +
+        "Ignore table of contents, page numbers, prefaces, appendices, glossaries, and reference lists.";
       var result = await original.call(this, p, schema, sys, preferredProvider, onStatus);
       try {
         if (result && result.data) {
@@ -329,7 +600,7 @@
       return result;
     };
     window.__revdevRunBatch.__hardQualityWrapped = true;
-    console.info("RevDev: hard question quality + near-dup + answer-position shuffle armed");
+    console.info("RevDev: hard quality + source clean + top-up armed");
     return true;
   }
 
@@ -340,36 +611,32 @@
     if (tries < 40) setTimeout(waitWrap, 250);
   })();
 
+  // Also clean extracted text as soon as it appears (for job.sourceText later)
+  var previewEl = document.getElementById("preview");
+  if (previewEl) {
+    new MutationObserver(function () {
+      if (window.__revdevExtractedText && !window.__revdevExtractedCleaned) {
+        window.__revdevExtractedTextClean = cleanSourceText(window.__revdevExtractedText);
+        window.__revdevExtractedCleaned = true;
+      }
+    }).observe(previewEl, { childList: true, characterData: true, subtree: true });
+  }
+
   var statusEl = document.getElementById("generation-status");
   if (statusEl) {
     var t = null;
     new MutationObserver(function () {
       var text = statusEl.textContent || "";
-      if (!/Done\.|Generated \d+/i.test(text)) return;
+      if (!/Done\.|Generated \d+|source supported/i.test(text)) return;
+      // Skip our own top-up status lines
+      if (/Top-up round/i.test(text)) return;
       if (t) clearTimeout(t);
       t = setTimeout(function () {
+        if (toppingUp) return;
         var r = applyFilterToJob();
         if (!r) return;
-        if (r.rejected > 0) {
-          var n = r.items.length;
-          var job = window.__revdevJob || {};
-          var requested = job.totalWanted || n;
-          var provider = job.provider === "groq" ? "Groq" : "Gemini";
-          if (n >= requested) {
-            statusEl.textContent = "Done. Generated " + n + " item(s) using " + provider + ".";
-            statusEl.className = "status-message success";
-          } else {
-            statusEl.textContent =
-              "Generated " + n + " of " + requested +
-              " after removing " + r.rejected + " weak/duplicate item(s).";
-            statusEl.className = "status-message error";
-          }
-          var countEl = document.getElementById("exam-count");
-          if (countEl && (job.mode === "exam" || !job.mode)) {
-            countEl.textContent = n + " questions";
-          }
-        }
-      }, 200);
+        // applyFilterToJob handles top-up + syncExamUI
+      }, 250);
     }).observe(statusEl, { childList: true, characterData: true, subtree: true });
   }
 })();
