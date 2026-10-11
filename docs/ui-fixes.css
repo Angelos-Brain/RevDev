@@ -647,3 +647,34 @@ textarea {
 @media (max-width: 480px) {
   .revdev-session-toast { top: 64px; font-size: 12.5px; }
 }
+
+
+/* RevDev logo mark + wordmark */
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  overflow: visible;
+}
+.brand-logo {
+  display: block;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+.brand-wordmark {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.brand-rev { color: var(--text, #111827); }
+.brand-dev { color: var(--primary, #4F46E5); }
+[data-theme="dark"] .brand-rev { color: #ffffff; }
+[data-theme="dark"] .brand-dev { color: #A5B4FC; }
