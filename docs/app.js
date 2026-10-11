@@ -7,4 +7,4 @@ const code = await res.text();
 const blobUrl = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
 await import(blobUrl);
 
-await import("./hard-quality.js?v=hq3");
+await import("./hard-quality.js?v=hq4");
