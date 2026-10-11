@@ -1,2 +1,2 @@
-/* RevDev Mock Exam timer: Off | Total time | Per question — see exam-timer.part2.js */
+/* RevDev Mock Exam timer entry */
 await import("./exam-timer.impl.js?v=t1");
