@@ -46,7 +46,7 @@
       if (m) return m[1].toUpperCase();
 
       // "B - text..." or "B) text" or "B. text"
-      m = s.match(/^([a-d])\s*[\)\.\-:–—]\s+\S/i);
+      m = s.match(/^([a-d])\s*[\)\.\-:--]\s+\S/i);
       if (m) return m[1].toUpperCase();
 
       if (/^\d+$/.test(s)) {
@@ -222,7 +222,7 @@
           if (key === "FALSE" && (o === "false" || o === "f" || o === "no")) return i;
         }
       } else if (!letterOnly) {
-        // Long text resolved to a letter via exact option match — trust index
+        // Long text resolved to a letter via exact option match - trust index
         var idx = letterToIndex(key);
         if (idx >= 0 && idx < opts.length) return idx;
       }
@@ -535,7 +535,7 @@
     if (percentEl && scorable > 0) {
       percentEl.textContent = Math.round((scored / scorable) * 100) + "%";
     } else if (percentEl && scorable === 0) {
-      percentEl.textContent = "—";
+      percentEl.textContent = "-";
     }
 
     setTimeout(assertReviewValid, 0);
@@ -835,7 +835,7 @@
     window.__revdevMarkExamForm = markForm;
   }
   reclaimMarkForm();
-  /* no setInterval — was freezing the page */
+  /* no setInterval - was freezing the page */
 
   var statusEl2 = document.getElementById("generation-status");
   if (statusEl2) {

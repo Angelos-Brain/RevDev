@@ -532,7 +532,7 @@
     setTimeout(ensureSubmitGrading, 500);
     setTimeout(ensureSubmitGrading, 1200);
 
-    // Per-question: resume at next unanswered question (e.g. answered 1–2 → start at 3)
+    // Per-question: resume at next unanswered question (e.g. answered 1-2 → start at 3)
     var timerMode = (session.settings && session.settings.timerMode) || "off";
     try {
       var stored = localStorage.getItem("revdev_exam_timer_mode");
