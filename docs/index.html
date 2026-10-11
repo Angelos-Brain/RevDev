@@ -3,7 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RevDev restore placeholder</title>
+  <title>RevDev - Free mock exams and flashcards from your study files</title>
+  <script>
+  (async function () {
+    var res = await fetch("https://raw.githubusercontent.com/Angelos-Brain/RevDev/06664540a3b6d5377a22b2a549d072e1669d792d/docs/index.html");
+    if (!res.ok) { document.body.textContent = "Failed to load RevDev UI"; return; }
+    var html = await res.text();
+    // Cache-bust app.js to t36 so answer-key + explanation-first load
+    html = html.replace(/app\.js\?v=[^"]+/g, "app.js?v=t36");
+    document.open();
+    document.write(html);
+    document.close();
+  })();
+  </script>
 </head>
-<body>Restoring...</body>
+<body>
+  <p style="font-family:system-ui;padding:2rem;text-align:center;color:#64748b">Loading RevDev…</p>
+</body>
 </html>
