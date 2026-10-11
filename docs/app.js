@@ -1,4 +1,4 @@
-/* RevDev loader: known-good UI patches + hard quality near-dup filter */
+/* RevDev loader: known-good UI patches + hard quality + exam timer */
 const res = await fetch(
   "https://raw.githubusercontent.com/Angelos-Brain/RevDev/ffb7eef/docs/app.js"
 );
@@ -8,3 +8,4 @@ const blobUrl = URL.createObjectURL(new Blob([code], { type: "text/javascript" }
 await import(blobUrl);
 
 await import("./hard-quality.js?v=hq4");
+await import("./exam-timer.js?v=t1");
