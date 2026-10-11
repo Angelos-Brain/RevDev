@@ -3,24 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="google-site-verification" content="liYB3f3T4RFYhrmlNAOgQsrelnmKMnVLk0dgGqrzFGc" />
-  <title>RevDev - Free mock exams and flashcards from your study files</title>
-  <meta name="description" content="RevDev is a free browser study tool. Upload PDF, DOCX, or notes and turn them into mock exams, flashcards, and summary reviewers. No account. Runs in your browser.">
-  <meta name="keywords" content="RevDev, study tool, mock exam generator, flashcards, PDF to quiz, free study app, summary reviewer">
-  <meta name="author" content="Mark Angelo P. Solsona">
-  <meta name="robots" content="index, follow">
-  <link rel="canonical" href="https://angelos-brain.github.io/RevDev/">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://angelos-brain.github.io/RevDev/">
-  <meta property="og:title" content="RevDev - Free mock exams and flashcards from your study files">
-  <meta property="og:description" content="Upload study files and generate mock exams, flashcards, and summaries in your browser. Free, no account required.">
-  <meta property="og:site_name" content="RevDev">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="RevDev - Free mock exams and flashcards from your study files">
-  <meta name="twitter:description" content="Upload study files and generate mock exams, flashcards, and summaries in your browser. Free, no account required.">
-  <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="favicon.svg">
-  <link rel="stylesheet" href="styles.css?v=ui19">
+  <meta name="description" content="RevDev turns your study files into exam-ready review material.">
+  <title>RevDev — Study File Reader</title>
+  <link rel="stylesheet" href="styles.css?v=ui15">
   <script>
     (function(){try{var t=localStorage.getItem("revdev_theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();
   </script>
@@ -33,14 +18,9 @@
   <header class="site-header">
     <div class="shell header-inner">
       <a class="brand" href="./" aria-label="RevDev home">
-        <span class="brand-mark" aria-hidden="true">
-          <svg class="brand-logo" viewBox="0 0 64 64" width="40" height="40" focusable="false" aria-hidden="true">
-            <rect width="64" height="64" rx="14" fill="#4F46E5"/>
-            <path fill="#fff" d="M18 12h18.5c8.8 0 14.5 5.2 14.5 13 0 5.9-3.4 10.4-8.8 12L51 52H40.8L32 38H26.5V52H18V12zm8.5 7v12.5H35c3.9 0 6.3-2.2 6.3-5.6 0-3.4-2.4-5.6-6.3-5.6h-8.5z"/>
-          </svg>
-        </span>
+        <span class="brand-mark" aria-hidden="true">R</span>
         <span>
-          <strong class="brand-wordmark"><span class="brand-rev">Rev</span><span class="brand-dev">Dev</span></strong>
+          <strong>RevDev</strong>
           <small>Study smarter from your files.</small>
         </span>
       </a>
@@ -96,7 +76,7 @@
             <span class="mode-number">01</span>
             <div>
               <strong>Mock Exam</strong>
-              <p>Custom item count (1-100) and question types with scoring and explanations.</p>
+              <p>Custom item count (1–100) and question types with scoring and explanations.</p>
             </div>
           </div>
           <div class="mode-item active">
@@ -127,7 +107,7 @@
         </div>
 
         <label class="dropzone" id="dropzone" for="file-input">
-          <input id="file-input" type="file" multiple accept=".pdf,.docx,.pptx,.txt,.md,.markdown,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/markdown,image/png,image/jpeg,image/webp">
+          <input id="file-input" type="file" multiple accept=".pdf,.docx,.pptx,.txt,.md,.markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/markdown">
           <span class="upload-icon" aria-hidden="true">↑</span>
           <span class="dropzone-title">Drop files here or click to browse</span>
           <span class="dropzone-subtitle">Multiple files are supported. Your files stay in this browser.</span>
@@ -154,7 +134,7 @@
       <div class="card-heading">
         <div>
           <span class="section-kicker">2 · CONNECT FREE AI</span>
-          <h2>Gemini &amp; Groq keys</h2>
+          <h2>Gemini & Groq keys</h2>
         </div>
         <span class="mini-note">Auto-failover · No backend</span>
       </div>
@@ -251,7 +231,7 @@
       <div id="count-options" class="exam-options">
         <div class="exam-options-heading">
           <span class="field-label">How many items</span>
-          <span class="mini-note" id="count-hint">1-100 (default 20)</span>
+          <span class="mini-note" id="count-hint">1–100 (default 20)</span>
         </div>
         <div class="count-slider-row">
           <input id="item-count-slider" type="range" min="1" max="100" value="20" step="1">
@@ -331,7 +311,7 @@
           </span>
           <span class="flashcard-face flashcard-back">
             <span class="face-label">Back</span>
-            <span id="flashcard-back">-</span>
+            <span id="flashcard-back">—</span>
           </span>
         </button>
       </div>
@@ -398,16 +378,14 @@
 
   <footer class="site-footer">
     <div class="shell footer-inner">
-      <p>RevDev dual-key failover · Runs in your browser · No account, no backend, no paid service required.</p>
+      <p>RevDev dual-key failover · Runs in your browser · No account, no backend, no paid service required. · v=t29</p>
       <p class="footer-credit">Built by <strong class="footer-author">Mark Angelo P. Solsona</strong></p>
     </div>
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.2/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mammoth@1.13.0/mammoth.browser.min.js"></script>
-  <script src="./session-backup.js?v=sb3"></script>
-  <script type="module" src="./ocr.js?v=ocr11"></script>
-  <script type="module" src="./app.js?v=t28"></script>
+  <script type="module" src="./app.js?v=t29"></script>
 
   <script>
   (function(){
