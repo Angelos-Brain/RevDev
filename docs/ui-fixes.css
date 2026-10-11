@@ -520,3 +520,35 @@ textarea {
     grid-template-columns: 18px 28px minmax(0, 1fr) 28px;
   }
 }
+
+/* OCR panel */
+.ocr-panel {
+  margin-top: 14px;
+}
+.ocr-banner {
+  padding: 14px 16px;
+  border-radius: var(--radius, 14px);
+  border: 1px solid color-mix(in srgb, var(--warning, #d97706) 35%, var(--line, #e5e7ef));
+  background: var(--warning-soft, #fffbeb);
+  color: var(--text, inherit);
+}
+.ocr-banner strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.92rem;
+}
+.ocr-banner p {
+  margin: 0 0 12px;
+  font-size: 0.88rem;
+  color: var(--text-secondary, var(--muted, #6b7280));
+  line-height: 1.45;
+}
+.ocr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ocr-panel .progress {
+  margin-top: 10px;
+}
