@@ -584,6 +584,7 @@
   }
 
   async function restoreAll() {
+    if (window.__revdevSessionRestored) return;
     restoring = true;
     try {
       var session = await idbGet("session");
@@ -611,7 +612,10 @@
       if (session.extractedText) parts.push("extracted text");
       if (examInfo) parts.push(examInfo.count + " exam questions (" + examInfo.answered + " answers kept)");
       if (parts.length) {
+        window.__revdevSessionRestored = true;
         toast("Session restored: " + parts.join(", ") + ". You can continue where you left off.", "ok");
+      } else {
+        window.__revdevSessionRestored = true;
       }
     } catch (e) {
       console.warn("[RevDev persist] restore failed", e);
