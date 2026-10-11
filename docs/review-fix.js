@@ -46,7 +46,7 @@
       if (m) return m[1].toUpperCase();
 
       // "B - text..." or "B) text" or "B. text"
-      m = s.match(/^([a-d])\s*[\)\.\-:--]\s+\S/i);
+      m = s.match(/^([a-d])\s*[)\.\:-]\s+\S/i);
       if (m) return m[1].toUpperCase();
 
       if (/^\d+$/.test(s)) {
@@ -747,14 +747,13 @@
     }
   }
 
-  
+
   function forceGradeFromDomAndTimer() {
     var form = document.getElementById("exam-form");
     if (!form) return;
-    var items = getExamItems();
+    var items = typeof getExamItems === "function" ? getExamItems() : [];
     var fieldsets = form.querySelectorAll(".exam-question");
     if (!fieldsets.length) return;
-
     var results = {};
     try {
       if (window.__revdevExamTimer && window.__revdevExamTimer.getState) {
@@ -762,26 +761,17 @@
         if (st && st.results) results = st.results;
       }
     } catch (e) {}
-
     var scored = 0;
     var total = fieldsets.length;
-
     fieldsets.forEach(function (fs, index) {
       var q = items[index] || {};
       var radios = fs.querySelectorAll('input[type="radio"]');
       var userIdx = -1;
-      var userAnswer = "";
-      radios.forEach(function (r, ri) {
-        if (r.checked) {
-          userIdx = ri;
-          userAnswer = r.value;
-        }
-      });
+      radios.forEach(function (r, ri) { if (r.checked) userIdx = ri; });
       if (userIdx < 0) {
         var tr = results[index] || results[String(index)];
         if (tr && tr.answer != null && String(tr.answer).trim()) {
-          userAnswer = String(tr.answer).trim();
-          var ua = userAnswer.toUpperCase();
+          var ua = String(tr.answer).trim().toUpperCase();
           radios.forEach(function (r, ri) {
             var letter = String.fromCharCode(65 + ri);
             if (ua === letter || ua === String(r.value).toUpperCase()) {
@@ -789,34 +779,29 @@
               r.checked = true;
             }
           });
-          if (userIdx < 0 && /^[A-D]$/i.test(userAnswer)) {
-            userIdx = userAnswer.toUpperCase().charCodeAt(0) - 65;
+          if (userIdx < 0 && /^[A-D]$/.test(ua)) {
+            userIdx = ua.charCodeAt(0) - 65;
+            if (userIdx >= 0 && userIdx < radios.length) radios[userIdx].checked = true;
           }
         }
       }
-
       var correctIdx = resolveCorrectOptionIndex(q);
-      // Fallback: letter answer against current option order
       if (correctIdx < 0) {
         var key = normalizeAnswerKey(q);
         if (key && /^[A-D]$/.test(key)) correctIdx = key.charCodeAt(0) - 65;
       }
-
       fs.classList.remove("is-correct", "is-incorrect", "is-unanswered", "is-no-key");
       fs.querySelectorAll(".choice-option").forEach(function (opt) {
         opt.classList.remove("is-user-correct", "is-user-wrong", "is-correct-answer");
         var m = opt.querySelector(".result-mark");
         if (m) m.remove();
       });
-
       var hasKey = correctIdx >= 0 && correctIdx < radios.length;
       var correct = hasKey && userIdx === correctIdx;
       if (correct) scored++;
-
       if (!hasKey) fs.classList.add("is-no-key");
       else if (correct) fs.classList.add("is-correct");
       else fs.classList.add("is-incorrect");
-
       radios.forEach(function (input, i) {
         var lab = input.closest(".choice-option");
         if (!lab) return;
@@ -837,7 +822,6 @@
         input.disabled = true;
       });
     });
-
     var scoreEl = document.getElementById("exam-score");
     var percentEl = document.getElementById("exam-percent");
     if (scoreEl) scoreEl.textContent = scored + " / " + total;
@@ -847,566 +831,18 @@
   }
 
   window.__revdevForceGradePerQuestion = forceGradeFromDomAndTimer;
-
-  window.__revdevMarkExamForm = function(outcomes) {
-    markForm(outcomes);
-    // If still 0/0 after normal mark, force grade
+  window.__revdevMarkExamForm = function (outcomes) {
+    try { markForm(outcomes); } catch (e) {}
     setTimeout(function () {
       var se = document.getElementById("exam-score");
       if (se && /^0\s*\/\s*0$/.test((se.textContent || "").trim())) {
-        forceGradeFromDomAndTimer();
+        try { forceGradeFromDomAndTimer(); } catch (e2) {}
       }
     }, 50);
   };
   window.__revdevMarkExamFormRaw = markForm;
-  window.__revdevAssertReviewValid = assertReviewValid;
-
-  // Re-install if something else overwrites
-  [0, 300, 1000, 2500].forEach(function (ms) {
-    setTimeout(function () {
-      
-  function forceGradeFromDomAndTimer() {
-    var form = document.getElementById("exam-form");
-    if (!form) return;
-    var items = getExamItems();
-    var fieldsets = form.querySelectorAll(".exam-question");
-    if (!fieldsets.length) return;
-
-    var results = {};
-    try {
-      if (window.__revdevExamTimer && window.__revdevExamTimer.getState) {
-        var st = window.__revdevExamTimer.getState();
-        if (st && st.results) results = st.results;
-      }
-    } catch (e) {}
-
-    var scored = 0;
-    var total = fieldsets.length;
-
-    fieldsets.forEach(function (fs, index) {
-      var q = items[index] || {};
-      var radios = fs.querySelectorAll('input[type="radio"]');
-      var userIdx = -1;
-      var userAnswer = "";
-      radios.forEach(function (r, ri) {
-        if (r.checked) {
-          userIdx = ri;
-          userAnswer = r.value;
-        }
-      });
-      if (userIdx < 0) {
-        var tr = results[index] || results[String(index)];
-        if (tr && tr.answer != null && String(tr.answer).trim()) {
-          userAnswer = String(tr.answer).trim();
-          var ua = userAnswer.toUpperCase();
-          radios.forEach(function (r, ri) {
-            var letter = String.fromCharCode(65 + ri);
-            if (ua === letter || ua === String(r.value).toUpperCase()) {
-              userIdx = ri;
-              r.checked = true;
-            }
-          });
-          if (userIdx < 0 && /^[A-D]$/i.test(userAnswer)) {
-            userIdx = userAnswer.toUpperCase().charCodeAt(0) - 65;
-          }
-        }
-      }
-
-      var correctIdx = resolveCorrectOptionIndex(q);
-      // Fallback: letter answer against current option order
-      if (correctIdx < 0) {
-        var key = normalizeAnswerKey(q);
-        if (key && /^[A-D]$/.test(key)) correctIdx = key.charCodeAt(0) - 65;
-      }
-
-      fs.classList.remove("is-correct", "is-incorrect", "is-unanswered", "is-no-key");
-      fs.querySelectorAll(".choice-option").forEach(function (opt) {
-        opt.classList.remove("is-user-correct", "is-user-wrong", "is-correct-answer");
-        var m = opt.querySelector(".result-mark");
-        if (m) m.remove();
-      });
-
-      var hasKey = correctIdx >= 0 && correctIdx < radios.length;
-      var correct = hasKey && userIdx === correctIdx;
-      if (correct) scored++;
-
-      if (!hasKey) fs.classList.add("is-no-key");
-      else if (correct) fs.classList.add("is-correct");
-      else fs.classList.add("is-incorrect");
-
-      radios.forEach(function (input, i) {
-        var lab = input.closest(".choice-option");
-        if (!lab) return;
-        if (hasKey && i === correctIdx) {
-          lab.classList.add("is-correct-answer");
-          if (i === userIdx) lab.classList.add("is-user-correct");
-          var check = document.createElement("span");
-          check.className = "result-mark result-mark-check";
-          check.textContent = "\u2713";
-          lab.appendChild(check);
-        } else if (i === userIdx && hasKey) {
-          lab.classList.add("is-user-wrong");
-          var cross = document.createElement("span");
-          cross.className = "result-mark result-mark-cross";
-          cross.textContent = "\u2715";
-          lab.appendChild(cross);
-        }
-        input.disabled = true;
-      });
-    });
-
-    var scoreEl = document.getElementById("exam-score");
-    var percentEl = document.getElementById("exam-percent");
-    if (scoreEl) scoreEl.textContent = scored + " / " + total;
-    if (percentEl) percentEl.textContent = total ? Math.round((scored / total) * 100) + "%" : "0%";
-    window.__revdevExamSubmitted = true;
-    console.info("[RevDev] forceGrade scored", scored, "/", total);
-  }
-
-  window.__revdevForceGradePerQuestion = forceGradeFromDomAndTimer;
-
-  window.__revdevMarkExamForm = function(outcomes) {
-    markForm(outcomes);
-    // If still 0/0 after normal mark, force grade
-    setTimeout(function () {
-      var se = document.getElementById("exam-score");
-      if (se && /^0\s*\/\s*0$/.test((se.textContent || "").trim())) {
-        forceGradeFromDomAndTimer();
-      }
-    }, 50);
-  };
-  window.__revdevMarkExamFormRaw = markForm;
-    }, ms);
-  });
-
-  /* ---------- Time chip fix (patch timer decorateReviewInner) ---------- */
-  function fixTimeChips() {
-    var form = document.getElementById("exam-form");
-    if (!form) return;
-    // Only touch chips that already exist or will be created
-    // We intercept by wrapping a periodic cleaner and by patching if available
-  }
-
-  // Override any existing decorateReviewInner by observing chips and correcting text
-  function correctChipText(chip, fieldset) {
-    if (!chip || !fieldset) return;
-    var answered = false;
-    var radios = fieldset.querySelectorAll('input[type="radio"]');
-    radios.forEach(function (r) {
-      if (r.checked) answered = true;
-    });
-    var text = fieldset.querySelector('input[type="text"]');
-    if (text && String(text.value || "").trim()) answered = true;
-    // Also check selected class
-    if (fieldset.querySelector(".choice-option.selected, .choice-option.is-user-correct, .choice-option.is-user-wrong")) {
-      answered = true;
-    }
-    var isUnansweredBadge = fieldset.classList.contains("is-unanswered") ||
-      (fieldset.querySelector(".review-status.is-unanswered") != null);
-    if (isUnansweredBadge) answered = false;
-
-    var txt = (chip.textContent || "").trim();
-    var isTimeout = /time'?s up/i.test(txt) || chip.classList.contains("is-timeout");
-    var secsMatch = txt.match(/(\d+)\s*s/);
-    var secs = secsMatch ? secsMatch[1] : "0";
-
-    if (!answered) {
-      if (isTimeout) {
-        chip.textContent = "Time's up";
-        chip.classList.add("is-timeout");
-      } else {
-        chip.textContent = "Skipped after " + secs + "s";
-        chip.classList.remove("is-timeout");
-      }
-    } else {
-      // keep "Answered in Xs" unless it was timeout
-      if (isTimeout) {
-        chip.textContent = "Time's up";
-      } else if (!/^Answered in/i.test(txt)) {
-        chip.textContent = "Answered in " + secs + "s";
-      }
-    }
-  }
-
-  // Mutation observer: fix chips as they appear; remove chips in total mode
-  function installChipGuard() {
-    function getTimerMode() {
-      try {
-        var m = localStorage.getItem("revdev_exam_timer_mode");
-        if (m === "off" || m === "total" || m === "per") return m;
-      } catch (e) {}
-      // fallback from UI
-      var sel = document.querySelector('input[name="exam-timer-mode"]:checked, #exam-timer-mode');
-      if (sel) return sel.value || sel.getAttribute("data-mode") || "total";
-      return "total";
-    }
-
-    function scrub() {
-      var form = document.getElementById("exam-form");
-      if (!form) return;
-      var mode = getTimerMode();
-      form.querySelectorAll(".exam-time-chip").forEach(function (chip) {
-        if (mode === "off" || mode === "total") {
-          chip.remove();
-          return;
-        }
-        var fs = chip.closest(".exam-question");
-        correctChipText(chip, fs);
-      });
-    }
-
-    var obs = new MutationObserver(function () {
-      scrub();
-    });
-    var target = document.getElementById("exam-output") || document.body;
-    obs.observe(target, { childList: true, subtree: true, characterData: true });
-    // also run after submit
-    document.addEventListener(
-      "click",
-      function (ev) {
-        var t = ev.target;
-        if (!t) return;
-        if (t.id === "submit-exam" || (t.closest && t.closest("#submit-exam"))) {
-          setTimeout(scrub, 200);
-          setTimeout(scrub, 600);
-          setTimeout(scrub, 1200);
-        }
-      },
-      true
-    );
-  }
-
-  installChipGuard();
-
-  // Also patch normalize used during generation validation if present
-  // (reject MC items whose key normalizes to null via existing filter path)
-  function hardenShuffleAnswers() {
-    // After hard-quality shuffle, convert letter answers to option text
-    // so grading by text still works with original dual app scorer
-    var items =
-      (window.__revdevJob && window.__revdevJob.collected) ||
-      (window.__revdevLastResult && window.__revdevLastResult.items) ||
-      window.__revdevPristineExamItems;
-    if (!Array.isArray(items)) return;
-    items.forEach(function (q) {
-      var type = String(q.type || "").toLowerCase().replace(/\s+/g, "_");
-      if (type !== "multiple_choice" && type !== "true_false") return;
-      if (!Array.isArray(q.options) || !q.options.length) return;
-      var key = normalizeAnswerKey(q);
-      if (key == null) return;
-      var idx = resolveCorrectOptionIndex(q);
-      if (idx >= 0 && idx < q.options.length) {
-        // Store as option text so any legacy matcher works
-        q.answers = [String(q.options[idx])];
-      }
-    });
-  }
-
-  var statusEl = document.getElementById("generation-status");
-  if (statusEl) {
-    new MutationObserver(function () {
-      var text = statusEl.textContent || "";
-      if (!/Done\.|Generated \d+/i.test(text)) return;
-      setTimeout(hardenShuffleAnswers, 250);
-    }).observe(statusEl, { childList: true, characterData: true, subtree: true });
-  }
-
-
-
-  /* ---------- Single source of truth for exam item count ---------- */
-  function getCanonicalItems() {
-    var form = document.getElementById("exam-form");
-    var rendered = form ? form.querySelectorAll(".exam-question").length : 0;
-    var candidates = [];
-    if (Array.isArray(window.__revdevFinalExamItems) && window.__revdevFinalExamItems.length) {
-      candidates.push(window.__revdevFinalExamItems);
-    }
-    if (Array.isArray(window.__revdevPristineExamItems) && window.__revdevPristineExamItems.length) {
-      candidates.push(window.__revdevPristineExamItems);
-    }
-    var job = window.__revdevJob;
-    if (job && Array.isArray(job.collected) && job.collected.length) {
-      candidates.push(job.collected);
-    }
-    var last = window.__revdevLastResult;
-    if (last && Array.isArray(last.items) && last.items.length) {
-      candidates.push(last.items);
-    }
-    // Prefer candidate whose length matches the rendered form
-    if (rendered > 0) {
-      for (var i = 0; i < candidates.length; i++) {
-        if (candidates[i].length === rendered) return candidates[i];
-      }
-    }
-    // Prefer longest non-empty
-    var best = [];
-    candidates.forEach(function (c) {
-      if (c.length > best.length) best = c;
-    });
-    return best;
-  }
-
-  function publishFinalItems(items) {
-    if (!Array.isArray(items)) return;
-    window.__revdevFinalExamItems = items.map(function (q) {
-      return {
-        type: q.type,
-        question: q.question,
-        options: Array.isArray(q.options) ? q.options.slice() : q.options,
-        answers: Array.isArray(q.answers) ? q.answers.slice() : q.answers,
-        explanation: q.explanation,
-        front: q.front,
-        back: q.back,
-        topic: q.topic
-      };
-    });
-    // Keep job/pristine in sync so nothing reads a stale shorter list
-    if (window.__revdevJob) window.__revdevJob.collected = window.__revdevFinalExamItems;
-    window.__revdevPristineExamItems = window.__revdevFinalExamItems;
-    if (window.__revdevLastResult) window.__revdevLastResult.items = window.__revdevFinalExamItems;
-  }
-
-  function assertCountsMatch() {
-    var form = document.getElementById("exam-form");
-    var rendered = form ? form.querySelectorAll(".exam-question").length : 0;
-    var header = document.getElementById("exam-count");
-    var headerN = header ? parseInt(String(header.textContent || "").replace(/\D/g, ""), 10) || 0 : 0;
-    var statusEl = document.getElementById("generation-status");
-    var statusText = statusEl ? String(statusEl.textContent || "") : "";
-    var statusM = statusText.match(/Generated\s+(\d+)/i);
-    var statusN = statusM ? parseInt(statusM[1], 10) : -1;
-    var startEl = document.getElementById("exam-timer-start");
-    var startN = -1;
-    if (startEl) {
-      var strong = startEl.querySelector(".start-meta strong");
-      if (strong) startN = parseInt(strong.textContent, 10) || -1;
-    }
-    var finalN = Array.isArray(window.__revdevFinalExamItems)
-      ? window.__revdevFinalExamItems.length
-      : -1;
-    var nums = { rendered: rendered, header: headerN, status: statusN, start: startN, final: finalN };
-    var vals = [rendered, headerN, finalN].filter(function (n) { return n > 0; });
-    var mismatch = false;
-    if (vals.length >= 2) {
-      var first = vals[0];
-      vals.forEach(function (v) { if (v !== first) mismatch = true; });
-    }
-    if (startN > 0 && rendered > 0 && startN !== rendered) mismatch = true;
-    if (mismatch) {
-      console.error("[RevDev assertCountsMatch] count mismatch", nums);
-    }
-    return !mismatch;
-  }
-
-  window.__revdevGetCanonicalItems = getCanonicalItems;
-  window.__revdevPublishFinalItems = publishFinalItems;
-  window.__revdevAssertCountsMatch = assertCountsMatch;
-
-  // After generation finishes, publish the rendered form's backing items as final
-  function syncFinalFromForm() {
-    var form = document.getElementById("exam-form");
-    if (!form) return;
-    var rendered = form.querySelectorAll(".exam-question").length;
-    if (!rendered) return;
-    var items = getCanonicalItems();
-    if (items.length !== rendered) {
-      // Prefer job.collected if it matches form
-      var job = window.__revdevJob;
-      if (job && Array.isArray(job.collected) && job.collected.length === rendered) {
-        items = job.collected;
-      } else if (
-        Array.isArray(window.__revdevPristineExamItems) &&
-        window.__revdevPristineExamItems.length === rendered
-      ) {
-        items = window.__revdevPristineExamItems;
-      }
-    }
-    if (items.length === rendered && rendered > 0) {
-      publishFinalItems(items);
-    }
-    var countEl = document.getElementById("exam-count");
-    if (countEl && rendered > 0) countEl.textContent = rendered + " questions";
-    assertCountsMatch();
-  }
-
-  // Continuously reclaim markForm so dual payload cannot overwrite it
-  function reclaimMarkForm() {
-    
-  function forceGradeFromDomAndTimer() {
-    var form = document.getElementById("exam-form");
-    if (!form) return;
-    var items = getExamItems();
-    var fieldsets = form.querySelectorAll(".exam-question");
-    if (!fieldsets.length) return;
-
-    var results = {};
-    try {
-      if (window.__revdevExamTimer && window.__revdevExamTimer.getState) {
-        var st = window.__revdevExamTimer.getState();
-        if (st && st.results) results = st.results;
-      }
-    } catch (e) {}
-
-    var scored = 0;
-    var total = fieldsets.length;
-
-    fieldsets.forEach(function (fs, index) {
-      var q = items[index] || {};
-      var radios = fs.querySelectorAll('input[type="radio"]');
-      var userIdx = -1;
-      var userAnswer = "";
-      radios.forEach(function (r, ri) {
-        if (r.checked) {
-          userIdx = ri;
-          userAnswer = r.value;
-        }
-      });
-      if (userIdx < 0) {
-        var tr = results[index] || results[String(index)];
-        if (tr && tr.answer != null && String(tr.answer).trim()) {
-          userAnswer = String(tr.answer).trim();
-          var ua = userAnswer.toUpperCase();
-          radios.forEach(function (r, ri) {
-            var letter = String.fromCharCode(65 + ri);
-            if (ua === letter || ua === String(r.value).toUpperCase()) {
-              userIdx = ri;
-              r.checked = true;
-            }
-          });
-          if (userIdx < 0 && /^[A-D]$/i.test(userAnswer)) {
-            userIdx = userAnswer.toUpperCase().charCodeAt(0) - 65;
-          }
-        }
-      }
-
-      var correctIdx = resolveCorrectOptionIndex(q);
-      // Fallback: letter answer against current option order
-      if (correctIdx < 0) {
-        var key = normalizeAnswerKey(q);
-        if (key && /^[A-D]$/.test(key)) correctIdx = key.charCodeAt(0) - 65;
-      }
-
-      fs.classList.remove("is-correct", "is-incorrect", "is-unanswered", "is-no-key");
-      fs.querySelectorAll(".choice-option").forEach(function (opt) {
-        opt.classList.remove("is-user-correct", "is-user-wrong", "is-correct-answer");
-        var m = opt.querySelector(".result-mark");
-        if (m) m.remove();
-      });
-
-      var hasKey = correctIdx >= 0 && correctIdx < radios.length;
-      var correct = hasKey && userIdx === correctIdx;
-      if (correct) scored++;
-
-      if (!hasKey) fs.classList.add("is-no-key");
-      else if (correct) fs.classList.add("is-correct");
-      else fs.classList.add("is-incorrect");
-
-      radios.forEach(function (input, i) {
-        var lab = input.closest(".choice-option");
-        if (!lab) return;
-        if (hasKey && i === correctIdx) {
-          lab.classList.add("is-correct-answer");
-          if (i === userIdx) lab.classList.add("is-user-correct");
-          var check = document.createElement("span");
-          check.className = "result-mark result-mark-check";
-          check.textContent = "\u2713";
-          lab.appendChild(check);
-        } else if (i === userIdx && hasKey) {
-          lab.classList.add("is-user-wrong");
-          var cross = document.createElement("span");
-          cross.className = "result-mark result-mark-cross";
-          cross.textContent = "\u2715";
-          lab.appendChild(cross);
-        }
-        input.disabled = true;
-      });
-    });
-
-    var scoreEl = document.getElementById("exam-score");
-    var percentEl = document.getElementById("exam-percent");
-    if (scoreEl) scoreEl.textContent = scored + " / " + total;
-    if (percentEl) percentEl.textContent = total ? Math.round((scored / total) * 100) + "%" : "0%";
-    window.__revdevExamSubmitted = true;
-    console.info("[RevDev] forceGrade scored", scored, "/", total);
-  }
-
-  window.__revdevForceGradePerQuestion = forceGradeFromDomAndTimer;
-
-  window.__revdevMarkExamForm = function(outcomes) {
-    markForm(outcomes);
-    // If still 0/0 after normal mark, force grade
-    setTimeout(function () {
-      var se = document.getElementById("exam-score");
-      if (se && /^0\s*\/\s*0$/.test((se.textContent || "").trim())) {
-        forceGradeFromDomAndTimer();
-      }
-    }, 50);
-  };
-  window.__revdevMarkExamFormRaw = markForm;
-  }
-  reclaimMarkForm();
-  /* no setInterval - was freezing the page */
-
-  var statusEl2 = document.getElementById("generation-status");
-  if (statusEl2) {
-    new MutationObserver(function () {
-      var text = statusEl2.textContent || "";
-      if (!/Done\.|Generated \d+/i.test(text)) return;
-      reclaimMarkForm();
-      setTimeout(function () {
-        reclaimMarkForm();
-        hardenShuffleAnswers();
-        syncFinalFromForm();
-      }, 300);
-      setTimeout(function () {
-        reclaimMarkForm();
-        syncFinalFromForm();
-      }, 800);
-    }).observe(statusEl2, { childList: true, characterData: true, subtree: true });
-  }
-
-  // When exam form is rebuilt, publish final items
-  var formEl = document.getElementById("exam-form");
-  if (formEl) {
-    new MutationObserver(function () {
-      if (formEl.querySelectorAll(".exam-question").length > 0) {
-        setTimeout(syncFinalFromForm, 50);
-      }
-    }).observe(formEl, { childList: true });
-  }
-
-  
-  // Re-grade after per-question timer finishes (answers synced into form async)
-  document.addEventListener(
-    "click",
-    function (ev) {
-      var t = ev.target;
-      if (!t) return;
-      if (t.id === "submit-exam" || (t.closest && t.closest("#submit-exam"))) {
-        setTimeout(function () { try { markForm(); } catch (e) {} }, 150);
-        setTimeout(function () { try { markForm(); } catch (e) {} }, 500);
-      }
-    },
-    true
-  );
-
-  // Observe results panel becoming visible (timer finishExam path)
-  var resultsEl = document.getElementById("exam-results");
-  if (resultsEl && window.MutationObserver) {
-    new MutationObserver(function () {
-      if (resultsEl.hidden) return;
-      setTimeout(function () {
-        try {
-          var se = document.getElementById("exam-score");
-          if (se && /^0\s*\/\s*0$/.test(se.textContent || "")) {
-            markForm();
-          }
-        } catch (e) {}
-      }, 100);
-      setTimeout(function () {
-        try { markForm(); } catch (e) {}
-      }, 400);
-    }).observe(resultsEl, { attributes: true, attributeFilter: ["hidden"] });
+  if (typeof window.__revdevAssertReviewValid !== "function" && typeof assertReviewValid === "function") {
+    window.__revdevAssertReviewValid = assertReviewValid;
   }
 
   console.info("RevDev: review-fix armed (strict single-green + counts + reclaim)");
