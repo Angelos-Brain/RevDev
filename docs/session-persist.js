@@ -215,10 +215,20 @@
     if (restoring) return;
     try {
       var files = await captureFilesFromInput();
-      var text = getPreviewText();
+      var text =
+        getPreviewText() ||
+        (window.__revdevSourceText && String(window.__revdevSourceText)) ||
+        (window.__revdevExtractedText && String(window.__revdevExtractedText)) ||
+        "";
+      text = String(text || "").trim();
       var patch = { settings: getSettingsSnapshot() };
       if (files) patch.files = files;
-      if (text && text.length > 20) patch.extractedText = text;
+      if (text && text.length > 20) {
+        patch.extractedText = text;
+        try {
+          localStorage.setItem("revdev_extracted_text_backup", text);
+        } catch (e2) {}
+      }
       await saveSession(patch);
     } catch (e) {
       console.warn("[RevDev persist] files save failed", e);
@@ -280,63 +290,110 @@
     saveTimer = setTimeout(function () { saveExamProgress(); }, SAVE_DEBOUNCE_MS);
   }
 
-  async function restoreFiles(session) {
-    if (!session || !session.files || !session.files.length) return false;
-    var input = qs("file-input");
-    if (!input) return false;
+  function applyExtractedText(text, label) {
+    text = String(text || "").trim();
+    if (!text) return false;
+    var preview = qs("preview");
+    if (preview) {
+      preview.textContent = text;
+      preview.classList.remove("empty-preview");
+    }
+    var meta = qs("preview-meta");
+    if (meta) {
+      meta.textContent =
+        (label || "Restored text") + " · " + text.length.toLocaleString() + " characters";
+    }
     try {
-      var dt = new DataTransfer();
-      session.files.forEach(function (f) {
-        var blob = new Blob([f.buffer], { type: f.type || "application/octet-stream" });
-        var file = new File([blob], f.name, {
-          type: f.type || "application/octet-stream",
-          lastModified: f.lastModified || Date.now()
+      window.__revdevExtractedText = text;
+      window.__revdevSourceText = text;
+      window.__revdevLastOcrText = window.__revdevLastOcrText || text;
+      if (window.__revdevJob) window.__revdevJob.sourceText = text;
+    } catch (e) {}
+    var gen = qs("generate-button");
+    if (gen) gen.disabled = false;
+    var genMeta = qs("generation-meta");
+    if (genMeta) genMeta.textContent = "Restored text ready - choose a study mode";
+    // localStorage backup for OCR/extracted text (survives if IDB file blobs fail)
+    try {
+      localStorage.setItem("revdev_extracted_text_backup", text);
+    } catch (e) {}
+    return true;
+  }
+
+  async function restoreFiles(session) {
+    if (!session) return false;
+    var restoredAny = false;
+    var input = qs("file-input");
+    try {
+      if (session.files && session.files.length && input) {
+        var dt = new DataTransfer();
+        session.files.forEach(function (f) {
+          if (!f || !f.buffer) return;
+          var blob = new Blob([f.buffer], { type: f.type || "application/octet-stream" });
+          var file = new File([blob], f.name, {
+            type: f.type || "application/octet-stream",
+            lastModified: f.lastModified || Date.now()
+          });
+          dt.items.add(file);
         });
-        dt.items.add(file);
-      });
-      input.files = dt.files;
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-
-      // Update file list UI if present
-      var list = qs("file-list");
-      var count = qs("file-count");
-      if (count) count.textContent = session.files.length + " file(s) restored";
-      if (list) {
-        list.innerHTML = session.files
-          .map(function (f) {
-            return "<li>" + escapeHtml(f.name) + " <span class=\"muted\">(" + formatSize(f.size) + ")</span></li>";
-          })
-          .join("");
-      }
-
-      // Restore extracted text into preview so Generate works without re-read
-      if (session.extractedText) {
-        var preview = qs("preview");
-        if (preview) {
-          preview.textContent = session.extractedText;
+        if (dt.files.length) {
+          input.files = dt.files;
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+          restoredAny = true;
         }
-        var meta = qs("preview-meta");
-        if (meta) {
-          meta.textContent =
-            session.files.length + " restored file(s) · " + session.extractedText.length.toLocaleString() + " characters";
-        }
-        // Common globals used by generators
-        try {
-          window.__revdevExtractedText = session.extractedText;
-          window.__revdevSourceText = session.extractedText;
-          if (window.__revdevJob) window.__revdevJob.sourceText = session.extractedText;
-        } catch (e) {}
-      }
 
-      // Click Read if text not already restored - gives app a chance to re-parse
-      if (!session.extractedText) {
+        var list = qs("file-list");
+        var count = qs("file-count");
+        if (count) count.textContent = session.files.length + " file(s) restored";
+        if (list) {
+          list.classList.remove("empty-state");
+          list.innerHTML = session.files
+            .map(function (f) {
+              return (
+                '<div class="file-item"><div class="file-info"><strong>' +
+                escapeHtml(f.name) +
+                '</strong><span class="file-meta">' +
+                escapeHtml(f.type || "file") +
+                " · " +
+                formatSize(f.size) +
+                '</span></div><span class="file-state ready">Restored</span></div>'
+              );
+            })
+            .join("");
+        }
         var readBtn = qs("read-button");
-        if (readBtn) setTimeout(function () { readBtn.click(); }, 300);
+        if (readBtn) readBtn.disabled = false;
       }
 
-      return true;
+      // Always restore extracted/OCR text when present (even if files could not be rebuilt)
+      if (session.extractedText) {
+        applyExtractedText(
+          session.extractedText,
+          (session.files && session.files.length ? session.files.length + " restored file(s)" : "Restored")
+        );
+        restoredAny = true;
+      } else if (!session.files || !session.files.length) {
+        // fallback to localStorage backup
+        try {
+          var bak = localStorage.getItem("revdev_extracted_text_backup");
+          if (bak && bak.length > 20) {
+            applyExtractedText(bak, "Restored backup text");
+            restoredAny = true;
+          }
+        } catch (e) {}
+      } else if (session.files && session.files.length && !session.extractedText) {
+        var readBtn2 = qs("read-button");
+        if (readBtn2) setTimeout(function () { readBtn2.click(); }, 300);
+      }
+
+      return restoredAny;
     } catch (e) {
       console.warn("[RevDev persist] restore files failed", e);
+      // Still try text-only restore
+      if (session.extractedText) {
+        applyExtractedText(session.extractedText, "Restored text");
+        return true;
+      }
       return false;
     }
   }
@@ -737,11 +794,13 @@
     wireExamCapture();
     wirePreviewWatch();
     // Restore after loaders finish
-    setTimeout(restoreAll, 900);
+    setTimeout(restoreAll, 600);
     setTimeout(function () {
-      // Second chance if render helpers loaded late
-      if (!window.__revdevRenderExamClean) setTimeout(restoreAll, 1500);
-    }, 2000);
+      if (!window.__revdevSessionRestored) restoreAll();
+    }, 1800);
+    setTimeout(function () {
+      if (!window.__revdevSessionRestored) restoreAll();
+    }, 3500);
   }
 
   if (document.readyState === "loading") {
@@ -751,6 +810,15 @@
   }
 
   window.__revdevSessionPersist = {
+    saveExtractedText: function (text) {
+      text = String(text || "").trim();
+      if (text.length > 20) {
+        try { localStorage.setItem("revdev_extracted_text_backup", text); } catch (e) {}
+        return saveSession({ extractedText: text, settings: getSettingsSnapshot() }).then(saveFilesNow);
+      }
+      return Promise.resolve();
+    },
+
     saveNow: function () { return saveExamProgress().then(saveFilesNow); },
     clear: function () { return idbDel("session"); },
     restore: restoreAll

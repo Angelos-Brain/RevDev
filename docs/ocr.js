@@ -779,6 +779,15 @@
       injectText(combined, targets.length + " OCR file(s) · " + engine, {
         mergeWithExisting: true
       });
+      try {
+        if (window.__revdevSessionPersist && window.__revdevSessionPersist.saveExtractedText) {
+          window.__revdevSessionPersist.saveExtractedText(
+            window.__revdevSourceText || combined
+          );
+        } else if (window.__revdevSessionPersist && window.__revdevSessionPersist.saveNow) {
+          window.__revdevSessionPersist.saveNow();
+        }
+      } catch (ePersist) {}
       var msg = hadExisting
         ? "OCR complete (" + engine + "). Image text was added alongside your Read files text."
         : "OCR complete (" + engine + "). Text is ready for Generate.";
