@@ -409,18 +409,60 @@
     return n;
   }
 
+  function ensureSubmitGrading() {
+    var form = qs("exam-form");
+    var submitBtn = qs("submit-exam");
+    if (form && typeof window.__revdevBindExamForm === "function") {
+      try { window.__revdevBindExamForm(form); } catch (e) {}
+    }
+    if (submitBtn) {
+      submitBtn.hidden = false;
+      submitBtn.disabled = false;
+      // Reliable grading path after restore (dual app handlers may be missing)
+      if (!submitBtn.__revdevPersistSubmit) {
+        submitBtn.__revdevPersistSubmit = true;
+        submitBtn.addEventListener("click", function (ev) {
+          if (window.__revdevExamSubmitted) return;
+          // Prefer review-fix markForm (builds outcomes from the live form)
+          if (typeof window.__revdevMarkExamForm === "function") {
+            try {
+              ev.preventDefault();
+              ev.stopPropagation();
+              window.__revdevExamSubmitted = true;
+              // markForm now builds outcomes from the form when none are passed
+              window.__revdevMarkExamForm();
+              // Show results panel if present
+              var results = qs("exam-results");
+              if (results) results.hidden = false;
+              var retake = qs("retake-exam");
+              if (retake) retake.hidden = false;
+              submitBtn.hidden = true;
+              scheduleSaveExam();
+              return;
+            } catch (err) {
+              console.warn("[RevDev persist] markForm failed", err);
+            }
+          }
+        }, true);
+      }
+    }
+  }
+
   async function restoreExam(session) {
     if (!session || !session.exam || !session.exam.items || !session.exam.items.length) return false;
     var items = session.exam.items;
     var answers = session.exam.answers || {};
+    var wasSubmitted = !!session.exam.submitted;
 
     window.__revdevFinalExamItems = items;
     window.__revdevPristineExamItems = items.slice();
     window.__revdevLastResult = { items: items, mode: "exam" };
     if (!window.__revdevJob) window.__revdevJob = {};
     window.__revdevJob.collected = items;
+    window.__revdevJob.items = items;
     window.__revdevExamReady = true;
-    window.__revdevExamSubmitted = !!session.exam.submitted;
+    window.__revdevExamSubmitted = false; // allow re-submit after restore unless we re-mark below
+    window.__revdevAnswerState = Object.create(null);
 
     // Render exam
     if (typeof window.__revdevRenderExamClean === "function") {
@@ -430,16 +472,31 @@
     // Show exam output section
     var out = qs("exam-output");
     if (out) out.hidden = false;
+    var examSection = document.querySelector(".exam-section, #exam-output");
+    if (examSection) examSection.hidden = false;
 
-    // Wait a tick for DOM, then apply answers
-    await new Promise(function (r) { setTimeout(r, 200); });
+    // Wait for DOM, then apply answers + wire submit
+    await new Promise(function (r) { setTimeout(r, 250); });
     var applied = applyAnswersToForm(answers);
+    ensureSubmitGrading();
+    // Bind again after a beat — render helpers may rebind late
+    setTimeout(ensureSubmitGrading, 500);
+    setTimeout(ensureSubmitGrading, 1200);
 
-    // If was in review, re-mark
-    if (session.exam.submitted && typeof window.__revdevMarkExamForm === "function") {
+    // If the previous session was already submitted, re-run grading
+    if (wasSubmitted && typeof window.__revdevMarkExamForm === "function") {
       setTimeout(function () {
-        try { window.__revdevMarkExamForm(); } catch (e) {}
-      }, 300);
+        try {
+          window.__revdevExamSubmitted = true;
+          window.__revdevMarkExamForm();
+          var results = qs("exam-results");
+          if (results) results.hidden = false;
+          var submitBtn = qs("submit-exam");
+          if (submitBtn) submitBtn.hidden = true;
+          var retake = qs("retake-exam");
+          if (retake) retake.hidden = false;
+        } catch (e) {}
+      }, 400);
     }
 
     return { count: items.length, answered: applied };
