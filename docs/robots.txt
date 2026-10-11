@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://angelos-brain.github.io/RevDev/sitemap.xml
