@@ -17,7 +17,6 @@
     var opts = Array.isArray(item.options) ? item.options : [];
     var type = String(item.type || "").toLowerCase().replace(/\s+/g, "_");
 
-    // Collect candidate strings from answers field
     var candidates = [];
     if (raw == null) {
       candidates = [];
@@ -34,66 +33,100 @@
       candidates.push(String(raw));
     }
 
-    // Reject multi-letter answers like "A, B" or "ALL"
     var joined = candidates.join(" ").trim();
     if (!joined) return null;
-    if (/\ball\b/i.test(joined)) return null;
+    if (/\ball\b/i.test(joined) && /[a-d]/i.test(joined) && candidates.length > 1) return null;
     if (/[a-d]\s*[,&/]\s*[a-d]/i.test(joined)) return null;
-    if (/\band\b/i.test(joined) && /[a-d]/i.test(joined)) return null;
 
     function tryOne(s) {
       s = String(s || "").trim();
       if (!s) return null;
 
-      // Letter forms
       var m = s.match(/^(?:option\s*|answer\s*:?\s*|\()?([a-d])\)?\.?$/i);
       if (m) return m[1].toUpperCase();
 
-      // Pure index 0-based or 1-based
+      // "B - text..." or "B) text" or "B. text"
+      m = s.match(/^([a-d])\s*[\)\.\-:–—]\s+\S/i);
+      if (m) return m[1].toUpperCase();
+
       if (/^\d+$/.test(s)) {
         var n = parseInt(s, 10);
         if (opts.length) {
-          if (n >= 0 && n < opts.length) return String.fromCharCode(65 + n); // 0-based
-          if (n >= 1 && n <= opts.length) return String.fromCharCode(64 + n); // 1-based
+          if (n >= 0 && n < opts.length) return String.fromCharCode(65 + n);
+          if (n >= 1 && n <= opts.length) return String.fromCharCode(64 + n);
         }
         return null;
       }
 
-      // True/False
-      var low = s.toLowerCase();
+      var low = s.toLowerCase().replace(/\s+/g, " ").trim();
       if (type === "true_false" || opts.length === 2) {
         if (low === "true" || low === "t" || low === "yes") return "TRUE";
         if (low === "false" || low === "f" || low === "no") return "FALSE";
       }
 
-      // Full option text match (exactly one)
+      // Exact option text match
       if (opts.length) {
         var hits = [];
-        var target = low.replace(/\s+/g, " ").trim();
         for (var i = 0; i < opts.length; i++) {
           var o = String(opts[i] || "").toLowerCase().replace(/\s+/g, " ").trim();
-          if (o && o === target) hits.push(i);
+          if (o && o === low) hits.push(i);
+        }
+        if (hits.length === 1) return String.fromCharCode(65 + hits[0]);
+
+        // Unique containment match (answer is substring of option or vice versa)
+        hits = [];
+        for (var j = 0; j < opts.length; j++) {
+          var oj = String(opts[j] || "").toLowerCase().replace(/\s+/g, " ").trim();
+          if (!oj) continue;
+          if (oj.indexOf(low) !== -1 || low.indexOf(oj) !== -1) hits.push(j);
         }
         if (hits.length === 1) return String.fromCharCode(65 + hits[0]);
       }
       return null;
     }
 
-    // Prefer a single candidate that resolves cleanly
     var resolved = [];
     for (var c = 0; c < candidates.length; c++) {
       var letter = tryOne(candidates[c]);
       if (letter) resolved.push(letter);
     }
-    // Unique resolved letter
     var uniq = [];
     resolved.forEach(function (L) {
       if (uniq.indexOf(L) === -1) uniq.push(L);
     });
     if (uniq.length === 1) return uniq[0];
-
-    // Last resort: whole joined string
     if (candidates.length === 1) return tryOne(candidates[0]);
+    return null;
+  }
+
+  /** If key is missing, try to recover from explanation text matching one option. */
+  function repairKeyFromExplanation(item) {
+    if (!item || !Array.isArray(item.options) || item.options.length < 2) return null;
+    var expl = String(item.explanation || "").toLowerCase().replace(/\s+/g, " ");
+    if (expl.length < 8) return null;
+    var hits = [];
+    for (var i = 0; i < item.options.length; i++) {
+      var o = String(item.options[i] || "").toLowerCase().replace(/\s+/g, " ").trim();
+      if (o.length < 12) continue; // too short to be distinctive
+      // significant overlap: first 40 chars of option appear in explanation
+      var probe = o.slice(0, Math.min(48, o.length));
+      if (probe.length >= 12 && expl.indexOf(probe) !== -1) hits.push(i);
+    }
+    if (hits.length === 1) return String.fromCharCode(65 + hits[0]);
+    // try longer unique tokens from each option
+    hits = [];
+    for (var j = 0; j < item.options.length; j++) {
+      var oj = String(item.options[j] || "").toLowerCase().replace(/\s+/g, " ").trim();
+      var words = oj.split(" ").filter(function (w) { return w.length > 5; });
+      var matched = 0;
+      words.forEach(function (w) {
+        if (expl.indexOf(w) !== -1) matched++;
+      });
+      if (words.length && matched >= Math.min(3, words.length) && matched / words.length >= 0.5) {
+        hits.push(j);
+      }
+    }
+    if (hits.length === 1) return String.fromCharCode(65 + hits[0]);
     return null;
   }
 
@@ -109,6 +142,15 @@
 
   function resolveCorrectOptionIndex(item) {
     var key = normalizeAnswerKey(item);
+    if (key == null) {
+      key = repairKeyFromExplanation(item);
+      if (key != null && Array.isArray(item.options)) {
+        var ri = key === "TRUE" || key === "FALSE" ? -1 : key.charCodeAt(0) - 65;
+        if (ri >= 0 && ri < item.options.length) {
+          item.answers = [String(item.options[ri])];
+        }
+      }
+    }
     if (key == null) return -1;
     var opts = Array.isArray(item.options) ? item.options : [];
     if (key === "TRUE" || key === "FALSE") {
@@ -239,7 +281,8 @@
             check.setAttribute("aria-hidden", "true");
             check.textContent = "\u2713";
             lab.appendChild(check);
-          } else if (isSelected && !correct) {
+          } else if (isSelected && hasKey && !correct) {
+            // Only mark wrong when we have a valid key
             lab.classList.add("is-user-wrong");
             var cross = document.createElement("span");
             cross.className = "result-mark result-mark-cross";
@@ -659,7 +702,7 @@
     window.__revdevMarkExamForm = markForm;
   }
   reclaimMarkForm();
-  setInterval(reclaimMarkForm, 1500);
+  /* no setInterval — was freezing the page */
 
   var statusEl2 = document.getElementById("generation-status");
   if (statusEl2) {
