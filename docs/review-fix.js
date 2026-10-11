@@ -536,5 +536,158 @@
     }).observe(statusEl, { childList: true, characterData: true, subtree: true });
   }
 
-  console.info("RevDev: review-fix armed (strict single-green + time chips)");
+
+
+  /* ---------- Single source of truth for exam item count ---------- */
+  function getCanonicalItems() {
+    var form = document.getElementById("exam-form");
+    var rendered = form ? form.querySelectorAll(".exam-question").length : 0;
+    var candidates = [];
+    if (Array.isArray(window.__revdevFinalExamItems) && window.__revdevFinalExamItems.length) {
+      candidates.push(window.__revdevFinalExamItems);
+    }
+    if (Array.isArray(window.__revdevPristineExamItems) && window.__revdevPristineExamItems.length) {
+      candidates.push(window.__revdevPristineExamItems);
+    }
+    var job = window.__revdevJob;
+    if (job && Array.isArray(job.collected) && job.collected.length) {
+      candidates.push(job.collected);
+    }
+    var last = window.__revdevLastResult;
+    if (last && Array.isArray(last.items) && last.items.length) {
+      candidates.push(last.items);
+    }
+    // Prefer candidate whose length matches the rendered form
+    if (rendered > 0) {
+      for (var i = 0; i < candidates.length; i++) {
+        if (candidates[i].length === rendered) return candidates[i];
+      }
+    }
+    // Prefer longest non-empty
+    var best = [];
+    candidates.forEach(function (c) {
+      if (c.length > best.length) best = c;
+    });
+    return best;
+  }
+
+  function publishFinalItems(items) {
+    if (!Array.isArray(items)) return;
+    window.__revdevFinalExamItems = items.map(function (q) {
+      return {
+        type: q.type,
+        question: q.question,
+        options: Array.isArray(q.options) ? q.options.slice() : q.options,
+        answers: Array.isArray(q.answers) ? q.answers.slice() : q.answers,
+        explanation: q.explanation,
+        front: q.front,
+        back: q.back,
+        topic: q.topic
+      };
+    });
+    // Keep job/pristine in sync so nothing reads a stale shorter list
+    if (window.__revdevJob) window.__revdevJob.collected = window.__revdevFinalExamItems;
+    window.__revdevPristineExamItems = window.__revdevFinalExamItems;
+    if (window.__revdevLastResult) window.__revdevLastResult.items = window.__revdevFinalExamItems;
+  }
+
+  function assertCountsMatch() {
+    var form = document.getElementById("exam-form");
+    var rendered = form ? form.querySelectorAll(".exam-question").length : 0;
+    var header = document.getElementById("exam-count");
+    var headerN = header ? parseInt(String(header.textContent || "").replace(/\D/g, ""), 10) || 0 : 0;
+    var statusEl = document.getElementById("generation-status");
+    var statusText = statusEl ? String(statusEl.textContent || "") : "";
+    var statusM = statusText.match(/Generated\s+(\d+)/i);
+    var statusN = statusM ? parseInt(statusM[1], 10) : -1;
+    var startEl = document.getElementById("exam-timer-start");
+    var startN = -1;
+    if (startEl) {
+      var strong = startEl.querySelector(".start-meta strong");
+      if (strong) startN = parseInt(strong.textContent, 10) || -1;
+    }
+    var finalN = Array.isArray(window.__revdevFinalExamItems)
+      ? window.__revdevFinalExamItems.length
+      : -1;
+    var nums = { rendered: rendered, header: headerN, status: statusN, start: startN, final: finalN };
+    var vals = [rendered, headerN, finalN].filter(function (n) { return n > 0; });
+    var mismatch = false;
+    if (vals.length >= 2) {
+      var first = vals[0];
+      vals.forEach(function (v) { if (v !== first) mismatch = true; });
+    }
+    if (startN > 0 && rendered > 0 && startN !== rendered) mismatch = true;
+    if (mismatch) {
+      console.error("[RevDev assertCountsMatch] count mismatch", nums);
+    }
+    return !mismatch;
+  }
+
+  window.__revdevGetCanonicalItems = getCanonicalItems;
+  window.__revdevPublishFinalItems = publishFinalItems;
+  window.__revdevAssertCountsMatch = assertCountsMatch;
+
+  // After generation finishes, publish the rendered form's backing items as final
+  function syncFinalFromForm() {
+    var form = document.getElementById("exam-form");
+    if (!form) return;
+    var rendered = form.querySelectorAll(".exam-question").length;
+    if (!rendered) return;
+    var items = getCanonicalItems();
+    if (items.length !== rendered) {
+      // Prefer job.collected if it matches form
+      var job = window.__revdevJob;
+      if (job && Array.isArray(job.collected) && job.collected.length === rendered) {
+        items = job.collected;
+      } else if (
+        Array.isArray(window.__revdevPristineExamItems) &&
+        window.__revdevPristineExamItems.length === rendered
+      ) {
+        items = window.__revdevPristineExamItems;
+      }
+    }
+    if (items.length === rendered && rendered > 0) {
+      publishFinalItems(items);
+    }
+    var countEl = document.getElementById("exam-count");
+    if (countEl && rendered > 0) countEl.textContent = rendered + " questions";
+    assertCountsMatch();
+  }
+
+  // Continuously reclaim markForm so dual payload cannot overwrite it
+  function reclaimMarkForm() {
+    window.__revdevMarkExamForm = markForm;
+  }
+  reclaimMarkForm();
+  setInterval(reclaimMarkForm, 1500);
+
+  var statusEl2 = document.getElementById("generation-status");
+  if (statusEl2) {
+    new MutationObserver(function () {
+      var text = statusEl2.textContent || "";
+      if (!/Done\.|Generated \d+/i.test(text)) return;
+      reclaimMarkForm();
+      setTimeout(function () {
+        reclaimMarkForm();
+        hardenShuffleAnswers();
+        syncFinalFromForm();
+      }, 300);
+      setTimeout(function () {
+        reclaimMarkForm();
+        syncFinalFromForm();
+      }, 800);
+    }).observe(statusEl2, { childList: true, characterData: true, subtree: true });
+  }
+
+  // When exam form is rebuilt, publish final items
+  var formEl = document.getElementById("exam-form");
+  if (formEl) {
+    new MutationObserver(function () {
+      if (formEl.querySelectorAll(".exam-question").length > 0) {
+        setTimeout(syncFinalFromForm, 50);
+      }
+    }).observe(formEl, { childList: true });
+  }
+
+  console.info("RevDev: review-fix armed (strict single-green + counts + reclaim)");
 })();
