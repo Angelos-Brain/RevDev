@@ -8,6 +8,6 @@ const blobUrl = URL.createObjectURL(new Blob([code], { type: "text/javascript" }
 await import(blobUrl);
 
 await import("./hard-quality.js?v=hq10");
-await import("./exam-timer.js?v=t7");
+await import("./exam-timer.js?v=t8");
 await import("./review-fix.js?v=rf6");
-await import("./session-persist.js?v=sp2");
+await import("./session-persist.js?v=sp3");
