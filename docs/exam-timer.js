@@ -1,2 +1,2 @@
 /* RevDev Mock Exam timer entry */
-await import("./exam-timer.impl.js?v=t12");
+await import("./exam-timer.impl.js?v=t13");
