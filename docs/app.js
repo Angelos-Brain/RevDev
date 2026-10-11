@@ -13,3 +13,4 @@ await import("./review-fix.js?v=rf13");
 await import("./session-persist.js?v=sp13");
 await import("./ocr.js?v=ocr12");
 await import("./per-question-grade.js?v=pq3");
+await import("./generate-ready-guard.js?v=gr1");
