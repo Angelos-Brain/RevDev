@@ -433,36 +433,61 @@
     if (form && typeof window.__revdevBindExamForm === "function") {
       try { window.__revdevBindExamForm(form); } catch (e) {}
     }
-    if (submitBtn) {
-      submitBtn.hidden = false;
-      submitBtn.disabled = false;
-      // Reliable grading path after restore (dual app handlers may be missing)
-      if (!submitBtn.__revdevPersistSubmit) {
-        submitBtn.__revdevPersistSubmit = true;
-        submitBtn.addEventListener("click", function (ev) {
-          if (window.__revdevExamSubmitted) return;
-          // Prefer review-fix markForm (builds outcomes from the live form)
-          if (typeof window.__revdevMarkExamForm === "function") {
-            try {
+    // Per-question taking: do not show classic Submit (timer Next / Finish only)
+    var timerMode = "off";
+    try {
+      if (window.__revdevExamTimer && window.__revdevExamTimer.getState) {
+        var st = window.__revdevExamTimer.getState();
+        if (st && st.mode === "per" && st.phase === "running") {
+          if (submitBtn) submitBtn.hidden = true;
+          return;
+        }
+      }
+      timerMode = localStorage.getItem("revdev_exam_timer_mode") || "off";
+    } catch (e) {}
+    if (timerMode === "per") {
+      var checked = document.querySelector('input[name="exam-timer-mode"]:checked');
+      if (checked && checked.value === "per") {
+        if (submitBtn) submitBtn.hidden = true;
+        // Still allow grading handler for when Finish expands the full form
+      }
+    }
+    if (submitBtn && !submitBtn.__revdevPersistSubmit) {
+      submitBtn.__revdevPersistSubmit = true;
+      submitBtn.addEventListener("click", function (ev) {
+        if (window.__revdevExamSubmitted) return;
+        // If per-question still running, ignore classic Submit
+        try {
+          if (window.__revdevExamTimer && window.__revdevExamTimer.getState) {
+            var s2 = window.__revdevExamTimer.getState();
+            if (s2 && s2.mode === "per" && s2.phase === "running") {
               ev.preventDefault();
               ev.stopPropagation();
-              window.__revdevExamSubmitted = true;
-              // markForm now builds outcomes from the form when none are passed
-              window.__revdevMarkExamForm();
-              // Show results panel if present
-              var results = qs("exam-results");
-              if (results) results.hidden = false;
-              var retake = qs("retake-exam");
-              if (retake) retake.hidden = false;
-              submitBtn.hidden = true;
-              scheduleSaveExam();
               return;
-            } catch (err) {
-              console.warn("[RevDev persist] markForm failed", err);
             }
           }
-        }, true);
-      }
+        } catch (e) {}
+        if (typeof window.__revdevMarkExamForm === "function") {
+          try {
+            ev.preventDefault();
+            ev.stopPropagation();
+            window.__revdevExamSubmitted = true;
+            window.__revdevMarkExamForm();
+            var results = qs("exam-results");
+            if (results) results.hidden = false;
+            var retake = qs("retake-exam");
+            if (retake) retake.hidden = false;
+            submitBtn.hidden = true;
+            scheduleSaveExam();
+          } catch (err) {
+            console.warn("[RevDev persist] markForm failed", err);
+          }
+        }
+      }, true);
+    }
+    if (submitBtn && timerMode !== "per") {
+      submitBtn.hidden = false;
+      submitBtn.disabled = false;
     }
   }
 
@@ -666,11 +691,13 @@
     // Periodic light save while answering
     setInterval(function () {
       if (restoring) return;
+      if (window.__revdevExamSubmitted) return;
       var form = qs("exam-form");
       if (!form || !form.querySelector(".exam-question")) return;
-      if (window.__revdevExamSubmitted) return;
-      saveExamProgress();
-    }, 8000);
+      // Avoid saving during heavy DOM review updates
+      if (document.body.classList.contains("has-exam-timer-bar") === false && form.querySelector(".is-correct, .is-incorrect")) return;
+      try { saveExamProgress(); } catch (e) {}
+    }, 12000);
   }
 
   function wirePreviewWatch() {
