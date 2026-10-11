@@ -269,9 +269,46 @@
     return String(text || "").replace(/^\s*explanation\s*:\s*/i, "").trim();
   }
 
+  function buildOutcomesFromForm() {
+    var form = document.getElementById("exam-form");
+    if (!form) return [];
+    var items =
+      (window.__revdevFinalExamItems && window.__revdevFinalExamItems.length && window.__revdevFinalExamItems) ||
+      (window.__revdevPristineExamItems && window.__revdevPristineExamItems.length && window.__revdevPristineExamItems) ||
+      (window.__revdevJob && window.__revdevJob.collected) ||
+      (window.__revdevLastResult && window.__revdevLastResult.items) ||
+      [];
+    var fieldsets = form.querySelectorAll(".exam-question");
+    var outcomes = [];
+    fieldsets.forEach(function (fs, index) {
+      var question = items[index] || {};
+      var name = "question-" + index;
+      var userAnswer = "";
+      var checked = form.querySelector('input[name="' + name + '"]:checked');
+      if (checked) userAnswer = checked.value;
+      else {
+        var text = form.querySelector('input[type="text"][name="' + name + '"], textarea[name="' + name + '"]');
+        if (text) userAnswer = text.value || "";
+      }
+      outcomes.push({
+        question: question,
+        userAnswer: userAnswer,
+        index: index
+      });
+    });
+    return outcomes;
+  }
+
   function markForm(outcomes) {
     var form = document.getElementById("exam-form");
-    if (!form || !outcomes || !outcomes.length) return;
+    if (!form) return;
+    if (!outcomes || !outcomes.length) {
+      outcomes = buildOutcomesFromForm();
+    }
+    if (!outcomes || !outcomes.length) {
+      console.warn("[RevDev] markForm: no outcomes and no form questions");
+      return;
+    }
     window.__revdevExamSubmitted = true;
     window.__revdevExamResults = outcomes;
 
