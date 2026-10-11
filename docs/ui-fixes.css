@@ -616,3 +616,34 @@ textarea {
 [data-theme="dark"] .site-footer .footer-author {
   color: var(--primary, #818cf8);
 }
+
+
+/* Session restore toast — top of viewport, below header */
+.revdev-session-toast {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  z-index: 99999;
+  max-width: min(520px, 92vw);
+  padding: 12px 16px;
+  border-radius: 12px;
+  font: 500 13px/1.45 system-ui, -apple-system, sans-serif;
+  color: #fff;
+  background: #111827;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.revdev-session-toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+.revdev-session-toast.is-ok { background: #065f46; }
+.revdev-session-toast.is-error { background: #991b1b; }
+.revdev-session-toast.is-info { background: #1f2937; }
+@media (max-width: 480px) {
+  .revdev-session-toast { top: 64px; font-size: 12.5px; }
+}

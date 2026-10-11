@@ -66,18 +66,24 @@
     if (!el) {
       el = document.createElement("div");
       el.id = "revdev-session-toast";
+      el.className = "revdev-session-toast";
       el.setAttribute("role", "status");
-      el.style.cssText =
-        "position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:99999;" +
-        "max-width:min(520px,92vw);padding:10px 16px;border-radius:10px;font:500 13px/1.4 system-ui,sans-serif;" +
-        "box-shadow:0 8px 28px rgba(0,0,0,.18);background:#111827;color:#fff;";
+      el.setAttribute("aria-live", "polite");
       document.body.appendChild(el);
     }
-    el.style.background = kind === "error" ? "#991b1b" : kind === "ok" ? "#065f46" : "#111827";
+    el.classList.remove("is-ok", "is-error", "is-info");
+    el.classList.add(kind === "error" ? "is-error" : kind === "ok" ? "is-ok" : "is-info");
     el.textContent = msg;
     el.hidden = false;
+    // restart enter animation
+    el.classList.remove("is-visible");
+    void el.offsetWidth;
+    el.classList.add("is-visible");
     clearTimeout(el._hide);
-    el._hide = setTimeout(function () { el.hidden = true; }, 4500);
+    el._hide = setTimeout(function () {
+      el.classList.remove("is-visible");
+      setTimeout(function () { el.hidden = true; }, 220);
+    }, 4500);
   }
 
   function readFileAsBuffer(file) {
