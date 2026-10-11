@@ -123,8 +123,11 @@
       "</div>";
 
     var status = qs("status");
+    var actions = uploadCard.querySelector(".action-row");
     if (status && status.parentNode === uploadCard) {
       uploadCard.insertBefore(panel, status);
+    } else if (actions && actions.parentNode === uploadCard) {
+      actions.insertAdjacentElement("afterend", panel);
     } else {
       uploadCard.appendChild(panel);
     }
@@ -833,6 +836,11 @@
   }
 
   function bind() {
+    if (window.__revdevOcrBound && qs("ocr-panel")) {
+      showPanel(true);
+      return;
+    }
+    window.__revdevOcrBound = true;
     extendFileInputAccept();
     ensureUi();
     showPanel(true);
@@ -868,11 +876,18 @@
     console.info("RevDev OCR: phases 1-4 armed (local + Gemini Vision + export)");
   }
 
+  function tryBind() {
+    try { bind(); } catch (e) { console.warn("OCR bind", e); }
+  }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {
-      setTimeout(bind, 400);
+      setTimeout(tryBind, 200);
+      setTimeout(tryBind, 1000);
+      setTimeout(tryBind, 2500);
     });
   } else {
-    setTimeout(bind, 400);
+    setTimeout(tryBind, 200);
+    setTimeout(tryBind, 1000);
+    setTimeout(tryBind, 2500);
   }
 })();

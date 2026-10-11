@@ -733,3 +733,14 @@ html[data-theme="dark"] a.brand .brand-dev {
 a.brand strong {
   color: inherit !important;
 }
+
+
+/* OCR panel force visible */
+.ocr-panel {
+  display: block !important;
+  margin-top: 16px !important;
+  margin-bottom: 8px !important;
+}
+.ocr-panel[hidden] {
+  display: block !important; /* still show; user asked to always see OCR */
+}
