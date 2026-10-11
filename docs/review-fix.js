@@ -100,34 +100,99 @@
   }
 
   /** If key is missing, try to recover from explanation text matching one option. */
+  function significantWords(s) {
+    return String(s || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter(function (w) {
+        return w.length > 4 &&
+          !/^(which|where|their|there|these|those|about|would|could|should|being|after|before|under|over|while|during|system|systems|ability|between)$/.test(w);
+      });
+  }
+
+  function scoreOverlap(a, b) {
+    var wa = significantWords(a);
+    var wb = significantWords(b);
+    if (!wa.length || !wb.length) return 0;
+    var setB = Object.create(null);
+    wb.forEach(function (w) { setB[w] = 1; });
+    var hit = 0;
+    wa.forEach(function (w) { if (setB[w]) hit++; });
+    return hit / Math.max(wa.length, 1);
+  }
+
   function repairKeyFromExplanation(item) {
     if (!item || !Array.isArray(item.options) || item.options.length < 2) return null;
-    var expl = String(item.explanation || "").toLowerCase().replace(/\s+/g, " ");
-    if (expl.length < 8) return null;
+    var expl = String(item.explanation || "");
+    if (expl.trim().length < 8) return null;
+
+    // 1) Option probe substring in explanation
     var hits = [];
     for (var i = 0; i < item.options.length; i++) {
       var o = String(item.options[i] || "").toLowerCase().replace(/\s+/g, " ").trim();
-      if (o.length < 12) continue; // too short to be distinctive
-      // significant overlap: first 40 chars of option appear in explanation
-      var probe = o.slice(0, Math.min(48, o.length));
-      if (probe.length >= 12 && expl.indexOf(probe) !== -1) hits.push(i);
+      if (o.length < 12) continue;
+      var probe = o.slice(0, Math.min(56, o.length));
+      if (probe.length >= 12 && expl.toLowerCase().indexOf(probe) !== -1) hits.push(i);
     }
     if (hits.length === 1) return String.fromCharCode(65 + hits[0]);
-    // try longer unique tokens from each option
-    hits = [];
+
+    // 2) Best word-overlap score with a clear margin
+    var scores = [];
     for (var j = 0; j < item.options.length; j++) {
-      var oj = String(item.options[j] || "").toLowerCase().replace(/\s+/g, " ").trim();
-      var words = oj.split(" ").filter(function (w) { return w.length > 5; });
-      var matched = 0;
-      words.forEach(function (w) {
-        if (expl.indexOf(w) !== -1) matched++;
-      });
-      if (words.length && matched >= Math.min(3, words.length) && matched / words.length >= 0.5) {
-        hits.push(j);
+      scores.push({ i: j, s: scoreOverlap(item.options[j], expl) });
+    }
+    scores.sort(function (a, b) { return b.s - a.s; });
+    if (scores.length >= 1 && scores[0].s >= 0.22) {
+      if (scores.length === 1 || scores[0].s >= scores[1].s + 0.05) {
+        return String.fromCharCode(65 + scores[0].i);
       }
     }
-    if (hits.length === 1) return String.fromCharCode(65 + hits[0]);
     return null;
+  }
+
+  /** Match answer strings to options using exact, contains, or overlap. */
+  function matchAnswersToOptionIndex(item) {
+    if (!item || !Array.isArray(item.options) || !item.options.length) return -1;
+    var raw = item.answers;
+    var candidates = [];
+    if (raw == null) return -1;
+    if (Array.isArray(raw)) {
+      raw.forEach(function (x) {
+        if (x == null) return;
+        if (Array.isArray(x)) x.forEach(function (y) { if (y != null) candidates.push(String(y)); });
+        else candidates.push(String(x));
+      });
+    } else {
+      candidates.push(String(raw));
+    }
+    var opts = item.options;
+    // exact / contains
+    for (var c = 0; c < candidates.length; c++) {
+      var ans = candidates[c].trim().toLowerCase().replace(/\s+/g, " ");
+      if (!ans || ans.length < 2) continue;
+      var hits = [];
+      for (var i = 0; i < opts.length; i++) {
+        var o = String(opts[i] || "").trim().toLowerCase().replace(/\s+/g, " ");
+        if (!o) continue;
+        if (o === ans || o.indexOf(ans) !== -1 || ans.indexOf(o) !== -1) hits.push(i);
+      }
+      if (hits.length === 1) return hits[0];
+    }
+    // overlap score against answer strings joined
+    var joined = candidates.join(" ");
+    if (joined.trim().length < 8) return -1;
+    var scores = [];
+    for (var j = 0; j < opts.length; j++) {
+      scores.push({ i: j, s: scoreOverlap(opts[j], joined) });
+    }
+    scores.sort(function (a, b) { return b.s - a.s; });
+    if (scores[0] && scores[0].s >= 0.35) {
+      if (scores.length === 1 || scores[0].s >= (scores[1] ? scores[1].s : 0) + 0.1) {
+        return scores[0].i;
+      }
+    }
+    return -1;
   }
 
   window.__revdevNormalizeAnswerKey = normalizeAnswerKey;
@@ -141,32 +206,63 @@
   }
 
   function resolveCorrectOptionIndex(item) {
+    if (!item || !Array.isArray(item.options) || !item.options.length) return -1;
+    var opts = item.options;
+
+    // 1) Strict letter / exact normalize
     var key = normalizeAnswerKey(item);
-    if (key == null) {
-      key = repairKeyFromExplanation(item);
-      if (key != null && Array.isArray(item.options)) {
-        var ri = key === "TRUE" || key === "FALSE" ? -1 : key.charCodeAt(0) - 65;
-        if (ri >= 0 && ri < item.options.length) {
-          item.answers = [String(item.options[ri])];
+    var raw0 = Array.isArray(item.answers) ? String((item.answers[0] != null ? item.answers[0] : "")) : String(item.answers || "");
+    var letterOnly = /^[a-d]$/i.test(raw0.trim()) || /^(option\s*)?[a-d]\.?$/i.test(raw0.trim());
+
+    if (key != null) {
+      if (key === "TRUE" || key === "FALSE") {
+        for (var i = 0; i < opts.length; i++) {
+          var o = String(opts[i] || "").trim().toLowerCase();
+          if (key === "TRUE" && (o === "true" || o === "t" || o === "yes")) return i;
+          if (key === "FALSE" && (o === "false" || o === "f" || o === "no")) return i;
         }
+      } else if (!letterOnly) {
+        // Long text resolved to a letter via exact option match — trust index
+        var idx = letterToIndex(key);
+        if (idx >= 0 && idx < opts.length) return idx;
+      }
+      // letter-only: do NOT trust index yet (options may have been shuffled); try text/explanation first
+    }
+
+    // 2) Text / contains / overlap match of answers → option
+    var byText = matchAnswersToOptionIndex(item);
+    if (byText >= 0) {
+      item.answers = [String(opts[byText])];
+      return byText;
+    }
+
+    // 3) Explanation repair (preferred over raw letter after possible shuffle)
+    var fromExpl = repairKeyFromExplanation(item);
+    if (fromExpl != null) {
+      var ri = fromExpl.charCodeAt(0) - 65;
+      if (ri >= 0 && ri < opts.length) {
+        item.answers = [String(opts[ri])];
+        return ri;
       }
     }
-    if (key == null) return -1;
-    var opts = Array.isArray(item.options) ? item.options : [];
-    if (key === "TRUE" || key === "FALSE") {
-      for (var i = 0; i < opts.length; i++) {
-        var o = String(opts[i] || "").trim().toLowerCase();
-        if (key === "TRUE" && (o === "true" || o === "t" || o === "yes")) return i;
-        if (key === "FALSE" && (o === "false" || o === "f" || o === "no")) return i;
+
+    // 4) Letter index last resort
+    if (key != null && key !== "TRUE" && key !== "FALSE") {
+      var idx2 = letterToIndex(key);
+      if (idx2 >= 0 && idx2 < opts.length) {
+        item.answers = [String(opts[idx2])];
+        return idx2;
       }
-      // fallback position
-      if (key === "TRUE") return 0;
-      if (key === "FALSE") return opts.length > 1 ? 1 : 0;
-      return -1;
     }
-    var idx = letterToIndex(key);
-    if (idx < 0 || idx >= opts.length) return -1;
-    return idx;
+
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn("[RevDev] answer key unavailable", {
+        answers: item.answers,
+        options: (item.options || []).map(function (x) { return String(x).slice(0, 60); }),
+        explanation: String(item.explanation || "").slice(0, 100)
+      });
+    }
+    return -1;
   }
 
   function stripExplanationPrefix(text) {
