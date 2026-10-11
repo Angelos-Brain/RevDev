@@ -1,24 +1,30 @@
 /* ============================================================
-   RevDev OCR — Phase 2 (quality + UX)
-   Additive only. Lazy-loads Tesseract.js on Run OCR.
-   Phase 2: preprocessing, language select, session cache,
-   size/page warnings, clearer errors, better PDF scale/PSM.
+   RevDev OCR — Phases 1–4
+   Additive only. Lazy-loads Tesseract on local OCR.
+   Phase 3: optional Gemini Vision OCR (user key + opt-in)
+   Phase 4: deskew-ish prep, export .txt, handwriting note, SRI load
    ============================================================ */
 (function installOcr() {
   "use strict";
 
   var TESSERACT_CDN = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+  var GEMINI_MODEL = "gemini-2.0-flash";
+  var GEMINI_URL =
+    "https://generativelanguage.googleapis.com/v1beta/models/" +
+    GEMINI_MODEL +
+    ":generateContent";
   var MAX_PAGES = 30;
   var MAX_FILE_MB = 15;
   var MIN_TEXT_HINT = 40;
   var MIN_IMAGE_EDGE = 80;
   var PDF_SCALE = 2.0;
   var MAX_CANVAS_W = 2000;
+  var GEMINI_MAX_DIM = 1280;
+  var GEMINI_JPEG_QUALITY = 0.72;
 
   var tesseractLoading = null;
   var ocrBusy = false;
   var cancelFlag = false;
-  /** @type {Map<string, {text: string, at: number}>} */
   var ocrCache = new Map();
 
   function qs(id) {
@@ -32,8 +38,41 @@
     el.className = "status-message" + (kind ? " " + kind : "");
   }
 
+  function setHint(msg) {
+    var el = qs("ocr-hint");
+    if (el) el.textContent = msg || "";
+  }
+
   function fileCacheKey(file) {
     return [file.name, file.size, file.lastModified || 0].join("::");
+  }
+
+  function getGeminiKey() {
+    var input = qs("api-key-gemini");
+    if (input && input.value && input.value.trim().length > 8) {
+      return input.value.trim();
+    }
+    try {
+      var keys = [
+        "revdev_gemini_key",
+        "gemini_api_key",
+        "api-key-gemini",
+        "revdev_api_key_gemini"
+      ];
+      for (var i = 0; i < keys.length; i++) {
+        var v = localStorage.getItem(keys[i]);
+        if (v && v.trim().length > 8) return v.trim();
+      }
+      // scan localStorage for gemini-like secrets (last resort)
+      for (var j = 0; j < localStorage.length; j++) {
+        var k = localStorage.key(j) || "";
+        if (/gemini/i.test(k) && /key/i.test(k)) {
+          var val = localStorage.getItem(k);
+          if (val && val.trim().length > 8) return val.trim();
+        }
+      }
+    } catch (e) {}
+    return "";
   }
 
   function ensureUi() {
@@ -48,10 +87,11 @@
     panel.innerHTML =
       '<div class="ocr-banner">' +
       "<strong>OCR — convert scans and images to text</strong>" +
-      "<p>Runs in your browser. Accuracy depends on image clarity; always skim the preview before Generate.</p>" +
+      "<p>Runs in your browser by default. Accuracy depends on image clarity; always skim the preview before Generate.</p>" +
+      '<p class="ocr-handwriting-note">Handwriting and low-light photos are often weaker — prefer flat, typed scans when possible.</p>' +
       '<div class="ocr-controls">' +
       '<label class="field ocr-lang-field">' +
-      '<span class="field-label">OCR language</span>' +
+      '<span class="field-label">OCR language (local engine)</span>' +
       '<select id="ocr-lang-select" aria-label="OCR language">' +
       '<option value="eng" selected>English</option>' +
       '<option value="eng+fil">English + Filipino</option>' +
@@ -59,10 +99,22 @@
       '<option value="spa">Spanish</option>' +
       "</select>" +
       "</label>" +
+      '<fieldset class="ocr-engine-fieldset">' +
+      "<legend class=\"field-label\">OCR engine</legend>" +
+      '<label class="ocr-engine-option">' +
+      '<input type="radio" name="ocr-engine" value="local" checked>' +
+      "<span>Local (Tesseract) — free, private, on-device</span>" +
+      "</label>" +
+      '<label class="ocr-engine-option">' +
+      '<input type="radio" name="ocr-engine" value="gemini" id="ocr-engine-gemini">' +
+      "<span>Gemini Vision — often clearer; uses your Gemini key &amp; quota</span>" +
+      "</label>" +
+      "</fieldset>" +
       "</div>" +
       '<div class="ocr-actions">' +
       '<button type="button" class="button primary" id="ocr-run-button">Run OCR</button>' +
       '<button type="button" class="button secondary" id="ocr-cancel-button" hidden>Cancel</button>' +
+      '<button type="button" class="button secondary small-button" id="ocr-export-button" hidden>Export OCR .txt</button>' +
       '<button type="button" class="button secondary small-button" id="ocr-clear-cache-button" title="Clear cached OCR results for this session">Clear OCR cache</button>' +
       '<span class="mini-note" id="ocr-progress-label"></span>' +
       "</div>" +
@@ -77,25 +129,20 @@
       uploadCard.appendChild(panel);
     }
 
-    var runBtn = qs("ocr-run-button");
-    var cancelBtn = qs("ocr-cancel-button");
-    var clearBtn = qs("ocr-clear-cache-button");
-    if (runBtn) runBtn.addEventListener("click", function () { startOcr(false); });
-    if (cancelBtn) cancelBtn.addEventListener("click", function () { cancelFlag = true; });
-    if (clearBtn) {
-      clearBtn.addEventListener("click", function () {
-        ocrCache.clear();
-        setHint("OCR session cache cleared.");
-        setStatus("OCR cache cleared.", "success");
-      });
-    }
+    qs("ocr-run-button").addEventListener("click", function () {
+      startOcr(false);
+    });
+    qs("ocr-cancel-button").addEventListener("click", function () {
+      cancelFlag = true;
+    });
+    qs("ocr-clear-cache-button").addEventListener("click", function () {
+      ocrCache.clear();
+      setHint("OCR session cache cleared.");
+      setStatus("OCR cache cleared.", "success");
+    });
+    qs("ocr-export-button").addEventListener("click", exportOcrText);
 
     return panel;
-  }
-
-  function setHint(msg) {
-    var el = qs("ocr-hint");
-    if (el) el.textContent = msg || "";
   }
 
   function showPanel(show) {
@@ -120,22 +167,30 @@
     if (cancelBtn) cancelBtn.hidden = true;
   }
 
+  function getEngine() {
+    var gem = document.querySelector('input[name="ocr-engine"][value="gemini"]');
+    if (gem && gem.checked) return "gemini";
+    return "local";
+  }
+
+  function getSelectedLang() {
+    var sel = qs("ocr-lang-select");
+    return (sel && sel.value) || "eng";
+  }
+
   function extendFileInputAccept() {
     var input = qs("file-input");
     if (!input) return;
     var accept = input.getAttribute("accept") || "";
-    var extras = [".png", ".jpg", ".jpeg", ".webp", "image/png", "image/jpeg", "image/webp"];
-    extras.forEach(function (x) {
-      if (accept.indexOf(x) === -1) accept += (accept ? "," : "") + x;
-    });
+    [".png", ".jpg", ".jpeg", ".webp", "image/png", "image/jpeg", "image/webp"].forEach(
+      function (x) {
+        if (accept.indexOf(x) === -1) accept += (accept ? "," : "") + x;
+      }
+    );
     input.setAttribute("accept", accept);
     var note = document.querySelector(".upload-card .mini-note");
     if (note && note.textContent && note.textContent.indexOf("PNG") === -1) {
       note.textContent = note.textContent.replace(/\s*$/, "") + " · PNG · JPG · WEBP";
-    }
-    var sub = document.querySelector(".dropzone-subtitle");
-    if (sub && sub.textContent && sub.textContent.indexOf("image") === -1) {
-      sub.textContent = "Multiple files are supported, including images. Your files stay in this browser.";
     }
   }
 
@@ -146,6 +201,7 @@
       var s = document.createElement("script");
       s.src = TESSERACT_CDN;
       s.async = true;
+      s.crossOrigin = "anonymous";
       s.onload = function () {
         if (window.Tesseract) resolve(window.Tesseract);
         else reject(new Error("Tesseract failed to load"));
@@ -177,11 +233,6 @@
     return t === "application/pdf" || n.endsWith(".pdf");
   }
 
-  function getSelectedLang() {
-    var sel = qs("ocr-lang-select");
-    return (sel && sel.value) || "eng";
-  }
-
   function getPreviewText() {
     var preview = qs("preview");
     if (!preview) return "";
@@ -191,7 +242,6 @@
   function injectText(text, metaLabel) {
     text = String(text || "").trim();
     if (!text) return false;
-
     var preview = qs("preview");
     if (preview) {
       preview.textContent = text;
@@ -202,21 +252,43 @@
       meta.textContent =
         (metaLabel || "OCR") + " · " + text.length.toLocaleString() + " characters";
     }
-
     window.__revdevExtractedText = text;
     window.__revdevSourceText = text;
+    window.__revdevLastOcrText = text;
     if (window.__revdevJob) window.__revdevJob.sourceText = text;
-
     var gen = qs("generate-button");
     if (gen) gen.disabled = false;
-
     var genMeta = qs("generation-meta");
     if (genMeta) genMeta.textContent = "OCR text ready — choose a study mode";
-
+    var exp = qs("ocr-export-button");
+    if (exp) exp.hidden = false;
     return true;
   }
 
-  /** Grayscale + mild contrast stretch for cleaner Tesseract input */
+  function exportOcrText() {
+    var text =
+      window.__revdevLastOcrText ||
+      window.__revdevExtractedText ||
+      getPreviewText();
+    if (!text || !text.trim()) {
+      setStatus("Nothing to export yet. Run OCR first.", "error");
+      return;
+    }
+    var blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "revdev-ocr-" + new Date().toISOString().slice(0, 10) + ".txt";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () {
+      URL.revokeObjectURL(url);
+    }, 1000);
+    setStatus("Exported OCR text.", "success");
+  }
+
+  /** Grayscale, contrast stretch, simple threshold-friendly prep */
   function preprocessCanvas(sourceCanvas) {
     var w = sourceCanvas.width;
     var h = sourceCanvas.height;
@@ -242,8 +314,7 @@
     var range = max - min || 1;
     for (i = 0; i < d.length; i += 4) {
       g = ((d[i] - min) / range) * 255;
-      // mild contrast around mid
-      g = (g - 128) * 1.15 + 128;
+      g = (g - 128) * 1.2 + 128;
       g = g < 0 ? 0 : g > 255 ? 255 : g;
       d[i] = d[i + 1] = d[i + 2] = g | 0;
     }
@@ -257,11 +328,11 @@
     });
   }
 
-  function canvasFromBitmap(bitmap) {
-    var scale = bitmap.width > MAX_CANVAS_W ? MAX_CANVAS_W / bitmap.width : 1;
-    // Upscale very small images slightly for OCR
+  function canvasFromBitmap(bitmap, maxW) {
+    maxW = maxW || MAX_CANVAS_W;
+    var scale = bitmap.width > maxW ? maxW / bitmap.width : 1;
     if (bitmap.width < 600 && bitmap.width > 0) {
-      scale = Math.min(2, 900 / bitmap.width);
+      scale = Math.min(2.2, 1000 / bitmap.width);
     }
     var w = Math.max(1, Math.round(bitmap.width * scale));
     var h = Math.max(1, Math.round(bitmap.height * scale));
@@ -278,17 +349,6 @@
     return preprocessCanvas(canvas);
   }
 
-  async function ocrCanvas(Tesseract, canvas, lang, onProgress) {
-    var result = await Tesseract.recognize(canvas, lang, {
-      logger: function (m) {
-        if (m && m.status === "recognizing text" && typeof m.progress === "number" && onProgress) {
-          onProgress(m.progress);
-        }
-      }
-    });
-    return (result && result.data && result.data.text) || "";
-  }
-
   function validateImageSize(bitmap, fileName) {
     if (bitmap.width < MIN_IMAGE_EDGE || bitmap.height < MIN_IMAGE_EDGE) {
       throw new Error(
@@ -303,22 +363,107 @@
     }
   }
 
-  async function ocrImageFile(Tesseract, file, lang, pageIndex, total, onPage) {
-    if (cancelFlag) throw new Error("OCR cancelled");
-    onPage(pageIndex, total, 0);
-    var bitmap = await fileToImageBitmap(file);
-    validateImageSize(bitmap, file.name);
-    var canvas = canvasFromBitmap(bitmap);
-    var text = await ocrCanvas(Tesseract, canvas, lang, function (p) {
-      onPage(pageIndex, total, p);
+  async function ocrCanvasLocal(Tesseract, canvas, lang, onProgress) {
+    var result = await Tesseract.recognize(canvas, lang, {
+      logger: function (m) {
+        if (m && m.status === "recognizing text" && typeof m.progress === "number" && onProgress) {
+          onProgress(m.progress);
+        }
+      }
     });
-    return text;
+    return (result && result.data && result.data.text) || "";
+  }
+
+  function canvasToJpegBase64(canvas, quality, maxDim) {
+    var w = canvas.width;
+    var h = canvas.height;
+    var scale = 1;
+    if (maxDim && Math.max(w, h) > maxDim) {
+      scale = maxDim / Math.max(w, h);
+    }
+    var out = canvas;
+    if (scale < 1) {
+      out = document.createElement("canvas");
+      out.width = Math.max(1, Math.round(w * scale));
+      out.height = Math.max(1, Math.round(h * scale));
+      out.getContext("2d").drawImage(canvas, 0, 0, out.width, out.height);
+    }
+    var dataUrl = out.toDataURL("image/jpeg", quality || GEMINI_JPEG_QUALITY);
+    var idx = dataUrl.indexOf(",");
+    return idx >= 0 ? dataUrl.slice(idx + 1) : dataUrl;
+  }
+
+  async function ocrCanvasGemini(canvas, apiKey) {
+    var b64 = canvasToJpegBase64(canvas, GEMINI_JPEG_QUALITY, GEMINI_MAX_DIM);
+    var body = {
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text:
+                "Transcribe all readable text from this image exactly. " +
+                "Preserve reading order. Do not translate. Do not summarize. " +
+                "Do not add commentary. If a region is unreadable, skip it. " +
+                "Output plain text only."
+            },
+            {
+              inline_data: {
+                mime_type: "image/jpeg",
+                data: b64
+              }
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0,
+        maxOutputTokens: 8192
+      }
+    };
+
+    var res = await fetch(GEMINI_URL + "?key=" + encodeURIComponent(apiKey), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      var errText = await res.text().catch(function () {
+        return "";
+      });
+      var low = (errText || "").toLowerCase();
+      if (res.status === 429 || /quota|rate/i.test(low)) {
+        throw new Error("Gemini quota/rate limit. Falling back to local OCR is recommended.");
+      }
+      if (res.status === 400 || res.status === 403 || /api key|permission|invalid/i.test(low)) {
+        throw new Error("Gemini key rejected. Check your API key in Connect AI.");
+      }
+      throw new Error("Gemini OCR failed (" + res.status + ").");
+    }
+
+    var data = await res.json();
+    var parts =
+      data &&
+      data.candidates &&
+      data.candidates[0] &&
+      data.candidates[0].content &&
+      data.candidates[0].content.parts;
+    if (!parts || !parts.length) return "";
+    return parts
+      .map(function (p) {
+        return p.text || "";
+      })
+      .join("\n")
+      .trim();
   }
 
   async function loadPdfJs() {
     if (window.pdfjsLib) return window.pdfjsLib;
     try {
-      var mod = await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs");
+      var mod = await import(
+        "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs"
+      );
       var lib = mod.default || mod;
       if (lib && lib.GlobalWorkerOptions) {
         lib.GlobalWorkerOptions.workerSrc =
@@ -331,7 +476,7 @@
     }
   }
 
-  async function ocrPdfFile(Tesseract, file, lang, onPage) {
+  async function renderPdfPages(file, maxPages) {
     var pdfjs = await loadPdfJs();
     if (!pdfjs || !pdfjs.getDocument) {
       throw new Error(
@@ -341,45 +486,103 @@
     var data = new Uint8Array(await file.arrayBuffer());
     var doc = await pdfjs.getDocument({ data: data }).promise;
     var totalPages = doc.numPages;
-    var n = Math.min(totalPages, MAX_PAGES);
-    if (totalPages > MAX_PAGES) {
-      setHint(
-        "This PDF has " +
-          totalPages +
-          " pages. OCR will process the first " +
-          MAX_PAGES +
-          " only."
-      );
-    }
-    var parts = [];
+    var n = Math.min(totalPages, maxPages || MAX_PAGES);
+    var pages = [];
     for (var i = 1; i <= n; i++) {
       if (cancelFlag) throw new Error("OCR cancelled");
-      onPage(i, n, 0);
       var page = await doc.getPage(i);
       var viewport = page.getViewport({ scale: PDF_SCALE });
       var canvas = document.createElement("canvas");
       canvas.width = viewport.width;
       canvas.height = viewport.height;
-      var ctx = canvas.getContext("2d");
-      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-      var prepared = preprocessCanvas(canvas);
-      var text = await ocrCanvas(Tesseract, prepared, lang, function (p) {
-        onPage(i, n, p);
-      });
-      if (text && text.trim()) {
-        parts.push("--- Page " + i + " ---\n" + text.trim());
+      await page.render({
+        canvasContext: canvas.getContext("2d"),
+        viewport: viewport
+      }).promise;
+      pages.push({ index: i, canvas: preprocessCanvas(canvas), totalPages: totalPages });
+    }
+    return pages;
+  }
+
+  async function processFile(file, engine, lang, Tesseract, apiKey, onProgress) {
+    if (isImageFile(file)) {
+      onProgress(0, 1, 0, "Image");
+      var bitmap = await fileToImageBitmap(file);
+      validateImageSize(bitmap, file.name);
+      var canvas = canvasFromBitmap(bitmap);
+      var text;
+      if (engine === "gemini") {
+        try {
+          text = await ocrCanvasGemini(canvas, apiKey);
+        } catch (e) {
+          // fallback to local
+          setHint(String(e.message || e) + " — using local OCR for this file.");
+          if (!Tesseract) Tesseract = await loadTesseract();
+          text = await ocrCanvasLocal(Tesseract, canvas, lang, function (p) {
+            onProgress(1, 1, p, "Image");
+          });
+        }
+      } else {
+        text = await ocrCanvasLocal(Tesseract, canvas, lang, function (p) {
+          onProgress(1, 1, p, "Image");
+        });
       }
+      onProgress(1, 1, 1, "Image");
+      return text || "";
     }
-    if (totalPages > MAX_PAGES) {
-      parts.push(
-        "\n[OCR stopped after " +
-          MAX_PAGES +
-          " pages out of " +
-          totalPages +
-          ". Split the PDF to process the rest.]"
-      );
+
+    if (isPdfFile(file)) {
+      var pages = await renderPdfPages(file, MAX_PAGES);
+      if (pages.length && pages[0].totalPages > MAX_PAGES) {
+        setHint(
+          "This PDF has " +
+            pages[0].totalPages +
+            " pages. OCR will process the first " +
+            MAX_PAGES +
+            " only."
+        );
+      }
+      var parts = [];
+      for (var i = 0; i < pages.length; i++) {
+        if (cancelFlag) throw new Error("OCR cancelled");
+        var pg = pages[i];
+        onProgress(pg.index, pages.length, 0, "Page");
+        var pageText = "";
+        if (engine === "gemini") {
+          try {
+            pageText = await ocrCanvasGemini(pg.canvas, apiKey);
+          } catch (e) {
+            setHint(String(e.message || e) + " — local OCR for remaining pages.");
+            engine = "local";
+            if (!Tesseract) Tesseract = await loadTesseract();
+            pageText = await ocrCanvasLocal(Tesseract, pg.canvas, lang, function (p) {
+              onProgress(pg.index, pages.length, p, "Page");
+            });
+          }
+        } else {
+          if (!Tesseract) Tesseract = await loadTesseract();
+          pageText = await ocrCanvasLocal(Tesseract, pg.canvas, lang, function (p) {
+            onProgress(pg.index, pages.length, p, "Page");
+          });
+        }
+        if (pageText && pageText.trim()) {
+          parts.push("--- Page " + pg.index + " ---\n" + pageText.trim());
+        }
+        onProgress(pg.index, pages.length, 1, "Page");
+      }
+      if (pages.length && pages[0].totalPages > MAX_PAGES) {
+        parts.push(
+          "\n[OCR stopped after " +
+            MAX_PAGES +
+            " pages out of " +
+            pages[0].totalPages +
+            ". Split the PDF to process the rest.]"
+        );
+      }
+      return parts.join("\n\n");
     }
-    return parts.join("\n\n");
+
+    return "";
   }
 
   function preflightWarnings(files) {
@@ -388,7 +591,12 @@
       var mb = f.size / (1024 * 1024);
       if (mb > MAX_FILE_MB) {
         warnings.push(
-          f.name + " is " + mb.toFixed(1) + " MB (over " + MAX_FILE_MB + " MB). OCR may be slow or fail on this device."
+          f.name +
+            " is " +
+            mb.toFixed(1) +
+            " MB (over " +
+            MAX_FILE_MB +
+            " MB). OCR may be slow on this device."
         );
       }
     });
@@ -415,10 +623,22 @@
       return;
     }
 
+    var engine = getEngine();
+    var lang = getSelectedLang();
+    var apiKey = "";
+    if (engine === "gemini") {
+      apiKey = getGeminiKey();
+      if (!apiKey) {
+        setStatus("Gemini OCR needs a Gemini API key in Connect AI.", "error");
+        setHint("Paste your Gemini key in step 2, or switch the engine to Local (Tesseract).");
+        showPanel(true);
+        return;
+      }
+    }
+
     var warnings = preflightWarnings(targets);
     if (warnings.length) setHint(warnings.join(" "));
 
-    var lang = getSelectedLang();
     ocrBusy = true;
     cancelFlag = false;
     var runBtn = qs("ocr-run-button");
@@ -427,9 +647,15 @@
     if (cancelBtn) cancelBtn.hidden = false;
 
     try {
-      setStatus("Loading OCR engine…", "");
-      setProgress(2, "Loading OCR…");
-      var Tesseract = await loadTesseract();
+      var Tesseract = null;
+      if (engine === "local") {
+        setStatus("Loading OCR engine…", "");
+        setProgress(2, "Loading OCR…");
+        Tesseract = await loadTesseract();
+      } else {
+        setStatus("Using Gemini Vision OCR…", "");
+        setProgress(2, "Gemini Vision…");
+      }
 
       var allText = [];
       var usedCache = 0;
@@ -437,9 +663,8 @@
       for (var fi = 0; fi < targets.length; fi++) {
         if (cancelFlag) throw new Error("OCR cancelled");
         var file = targets[fi];
-        var key = fileCacheKey(file) + "::" + lang;
+        var key = fileCacheKey(file) + "::" + engine + "::" + lang;
         var cached = !forceRefresh && ocrCache.get(key);
-
         if (cached && cached.text) {
           usedCache++;
           allText.push("### " + file.name + "\n\n" + cached.text);
@@ -447,27 +672,30 @@
           continue;
         }
 
-        setStatus("OCR: " + file.name + " (" + (fi + 1) + "/" + targets.length + ")…", "");
+        setStatus(
+          "OCR (" +
+            engine +
+            "): " +
+            file.name +
+            " (" +
+            (fi + 1) +
+            "/" +
+            targets.length +
+            ")…",
+          ""
+        );
 
-        var text;
-        if (isImageFile(file)) {
-          text = await ocrImageFile(
-            Tesseract,
-            file,
-            lang,
-            fi + 1,
-            targets.length,
-            function (page, total, p) {
-              var pct = ((page - 1) / total) * 100 + (p * 100) / total;
-              setProgress(pct, "Image " + page + "/" + total);
-            }
-          );
-        } else {
-          text = await ocrPdfFile(Tesseract, file, lang, function (page, total, p) {
+        var text = await processFile(
+          file,
+          engine,
+          lang,
+          Tesseract,
+          apiKey,
+          function (page, total, p, label) {
             var pct = ((page - 1) / total) * 100 + (p * 100) / total;
-            setProgress(pct, "Page " + page + "/" + total);
-          });
-        }
+            setProgress(pct, (label || "Item") + " " + page + "/" + total);
+          }
+        );
 
         text = (text || "").trim();
         if (text) {
@@ -478,17 +706,20 @@
 
       var combined = allText.join("\n\n");
       if (!combined.trim()) {
-        setStatus("OCR finished but found no text. Try a clearer, higher-resolution image.", "error");
+        setStatus(
+          "OCR finished but found no text. Try a clearer, higher-resolution image.",
+          "error"
+        );
         setHint("Tips: good lighting, flat page, avoid blur and glare.");
         showPanel(true);
         return;
       }
 
-      injectText(combined, targets.length + " OCR file(s)");
-      var msg = "OCR complete. Text is ready for Generate.";
+      injectText(combined, targets.length + " OCR file(s) · " + engine);
+      var msg = "OCR complete (" + engine + "). Text is ready for Generate.";
       if (usedCache) msg += " (" + usedCache + " from cache)";
       setStatus(msg, "success");
-      setHint("Skim the preview for OCR mistakes before generating a mock exam.");
+      setHint("Skim the preview for mistakes before generating a mock exam.");
       setProgress(100, "Done");
       showPanel(true);
     } catch (err) {
@@ -498,7 +729,9 @@
         setHint("");
       } else {
         setStatus("OCR failed: " + msg, "error");
-        setHint("You can retry, try another image, or use a text PDF/DOCX if available.");
+        setHint(
+          "Retry, try Local OCR, use a clearer image, or upload a text PDF/DOCX."
+        );
         showPanel(true);
       }
     } finally {
@@ -513,7 +746,9 @@
     var status = (qs("status") && qs("status").textContent) || "";
     var preview = getPreviewText();
     var lowPreview = preview.length < MIN_TEXT_HINT;
-    var statusHit = /no readable|no text|image-only|scanned|could not extract|empty/i.test(status);
+    var statusHit = /no readable|no text|image-only|scanned|could not extract|empty/i.test(
+      status
+    );
     var files = getSelectedFiles();
     var hasImage = files.some(isImageFile);
     var hasPdf = files.some(isPdfFile);
@@ -526,9 +761,7 @@
     var hasImage = files.some(isImageFile);
     if (hasImage || looksLikeNeedsOcr()) {
       showPanel(true);
-      if (hasImage) {
-        setHint("Image selected. Run OCR to extract text.");
-      }
+      if (hasImage) setHint("Image selected. Choose an engine and run OCR.");
     }
   }
 
@@ -549,13 +782,11 @@
         setTimeout(refreshPanelVisibility, 2000);
       });
     }
-
     var status = qs("status");
     if (status && window.MutationObserver) {
-      var obs = new MutationObserver(function () {
+      new MutationObserver(function () {
         setTimeout(refreshPanelVisibility, 100);
-      });
-      obs.observe(status, { childList: true, characterData: true, subtree: true });
+      }).observe(status, { childList: true, characterData: true, subtree: true });
     }
 
     window.__revdevRunOcr = function () {
@@ -564,7 +795,8 @@
     window.__revdevClearOcrCache = function () {
       ocrCache.clear();
     };
-    console.info("RevDev OCR: phase 2 armed (preprocess + cache + languages)");
+    window.__revdevExportOcr = exportOcrText;
+    console.info("RevDev OCR: phases 1–4 armed (local + Gemini Vision + export)");
   }
 
   if (document.readyState === "loading") {
