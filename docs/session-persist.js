@@ -234,6 +234,22 @@
     var answers = collectAnswersFromForm();
     var timer = getTimerSnapshot();
     var submitted = !!window.__revdevExamSubmitted;
+    // First unanswered index for per-question resume
+    var resumeIndex = 0;
+    var answeredIdx = Object.keys(answers).map(function (k) { return parseInt(k, 10); }).filter(function (n) { return !isNaN(n); }).sort(function (a, b) { return a - b; });
+    if (answeredIdx.length) {
+      // resume at the first gap, or one past the last answered
+      resumeIndex = 0;
+      for (var ai = 0; ai < answeredIdx.length; ai++) {
+        if (answeredIdx[ai] === resumeIndex) resumeIndex++;
+        else if (answeredIdx[ai] > resumeIndex) break;
+      }
+      if (timer && typeof timer.index === "number" && timer.index > resumeIndex) {
+        resumeIndex = timer.index;
+      }
+    } else if (timer && typeof timer.index === "number") {
+      resumeIndex = timer.index;
+    }
     var payload = {
       exam: {
         items: items,
@@ -241,6 +257,8 @@
         submitted: submitted,
         results: window.__revdevExamResults || null,
         timer: timer,
+        timerResults: timer && timer.results ? timer.results : null,
+        resumeIndex: resumeIndex,
         answerState: window.__revdevAnswerState || null
       },
       settings: getSettingsSnapshot(),
@@ -482,6 +500,44 @@
     // Bind again after a beat — render helpers may rebind late
     setTimeout(ensureSubmitGrading, 500);
     setTimeout(ensureSubmitGrading, 1200);
+
+    // Per-question: resume at next unanswered question (e.g. answered 1–2 → start at 3)
+    var timerMode = (session.settings && session.settings.timerMode) || "off";
+    try {
+      var stored = localStorage.getItem("revdev_exam_timer_mode");
+      if (stored) timerMode = stored;
+    } catch (e) {}
+    if (!wasSubmitted && timerMode === "per") {
+      var resumeAt = typeof session.exam.resumeIndex === "number" ? session.exam.resumeIndex : 0;
+      // Compute from answers if needed
+      if (!resumeAt && answers) {
+        var keys = Object.keys(answers).map(Number).filter(function (n) { return !isNaN(n); }).sort(function (a, b) { return a - b; });
+        resumeAt = 0;
+        for (var ki = 0; ki < keys.length; ki++) {
+          if (keys[ki] === resumeAt) resumeAt++;
+          else break;
+        }
+      }
+      window.__revdevResumePerIndex = resumeAt;
+      // Build timer results for already-answered questions so Next won't re-ask them
+      var preResults = session.exam.timerResults || {};
+      Object.keys(answers || {}).forEach(function (k) {
+        var ix = parseInt(k, 10);
+        if (isNaN(ix)) return;
+        if (!preResults[ix]) {
+          preResults[ix] = { answer: answers[k].value, timeUsedMs: 0, timedOut: false };
+        }
+      });
+      setTimeout(function () {
+        if (window.__revdevExamTimer && typeof window.__revdevExamTimer.resumeAt === "function") {
+          window.__revdevExamTimer.resumeAt(resumeAt, preResults);
+        } else {
+          // Fallback: click Start if start screen is shown, after setting resume index
+          var startBtn = qs("exam-timer-start-btn");
+          if (startBtn) startBtn.click();
+        }
+      }, 600);
+    }
 
     // If the previous session was already submitted, re-run grading
     if (wasSubmitted && typeof window.__revdevMarkExamForm === "function") {
