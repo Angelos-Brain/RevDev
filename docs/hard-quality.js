@@ -2,6 +2,7 @@
    HARD exam quality (STABILIZED): prompt rules + option shuffle
    - Does NOT drop generated items (no silent count shrink)
    - Soft in-place cleaning only; safety valve keeps original text
+   - Answer keys must match option text; reconciled from explanation
    ============================================================ */
 (function installHardQuestionQuality() {
   "use strict";
@@ -29,7 +30,14 @@
     "",
     "DIFFICULTY: Prefer application and analysis over trivial recall.",
     "MULTIPLE CHOICE: 4 plausible options; randomize correct-answer position (not always A).",
-    "True/False, identification, short answer: precise and non-trivial."
+    "True/False, identification, short answer: precise and non-trivial.",
+    "",
+    "ANSWER KEY RULES (CRITICAL — grading depends on these):",
+    "- The answers field MUST be the EXACT full text of the correct option (copy-paste the option string).",
+    "- Never put only a letter (A/B/C/D) in answers; always the full option text.",
+    "- The explanation MUST explicitly name the correct answer using the same wording as that option.",
+    "- Example: if the correct option is \"419 Page Expired\", answers must be [\"419 Page Expired\"] and the explanation must say that 419 Page Expired is correct.",
+    "- Do not invent facts that contradict the SOURCE text."
   ].join("\n");
 
   /** Soft clean: replace dot-leader runs and page-header phrases in place. Never delete lines. */
@@ -37,13 +45,10 @@
     var original = String(raw || "");
     if (!original) return original;
     var cleaned = original
-      // dotted leaders + page number (keep surrounding words)
       .replace(/\.{4,}\s*\d+/g, " ")
       .replace(/\u2026{2,}\s*\d+/g, " ")
-      // page header phrase only
       .replace(/Study\s+Guide\s+Page\s+\d+\s+of\s+\d+/gi, " ")
       .replace(/Page\s+\d+\s+of\s+\d+/gi, " ");
-    // Safety valve
     if (cleaned.length < original.length * 0.6 || cleaned.trim().length < 2000) {
       console.warn("[RevDev] softCleanSourceText: cleaned text too short; using ORIGINAL");
       return original;
@@ -56,13 +61,11 @@
     return String(s || "").trim().toLowerCase();
   }
 
-  /** Resolve answers to option TEXT before shuffle so letter keys stay valid. */
   function lockAnswerAsOptionText(q) {
     if (!q || !Array.isArray(q.options) || !q.options.length) return;
     var answers = Array.isArray(q.answers) ? q.answers : (q.answers != null ? [q.answers] : []);
     if (!answers.length) return;
     var opts = q.options;
-    // Exact or contains match against option text
     for (var a = 0; a < answers.length; a++) {
       var ans = String(answers[a] || "").trim().toLowerCase().replace(/\s+/g, " ");
       if (!ans) continue;
@@ -79,7 +82,6 @@
         return;
       }
     }
-    // Letter form: A/B/C/D or Option A etc.
     for (var a2 = 0; a2 < answers.length; a2++) {
       var s = String(answers[a2] || "").trim();
       var m = s.match(/^(?:option\s*|answer\s*:?\s*|\()?([a-d])\)?\.?$/i);
@@ -90,14 +92,12 @@
           return;
         }
       }
-      // numeric index
       if (/^\d+$/.test(s)) {
         var n = parseInt(s, 10);
         if (n >= 0 && n < opts.length) { q.answers = [String(opts[n])]; return; }
         if (n >= 1 && n <= opts.length) { q.answers = [String(opts[n - 1])]; return; }
       }
     }
-    // True/False
     for (var a3 = 0; a3 < answers.length; a3++) {
       var low = String(answers[a3] || "").trim().toLowerCase();
       if (low === "true" || low === "t" || low === "yes") {
@@ -113,12 +113,42 @@
     }
   }
 
+  function reconcileAnswerWithExplanation(q) {
+    if (!q || !Array.isArray(q.options) || q.options.length < 2) return;
+    var expl = String(q.explanation || "").toLowerCase().replace(/\s+/g, " ");
+    if (expl.length < 8) return;
+    var hits = [];
+    for (var i = 0; i < q.options.length; i++) {
+      var o = String(q.options[i] || "").toLowerCase().replace(/\s+/g, " ").trim();
+      if (o.length < 6) continue;
+      var probe = o.slice(0, Math.min(56, o.length));
+      if (probe.length >= 6 && expl.indexOf(probe) !== -1) hits.push(i);
+    }
+    if (hits.length === 1) {
+      q.answers = [String(q.options[hits[0]])];
+      return;
+    }
+    var codes = {};
+    var re = /(?:status\s*code|returns?|receives?|encounters?|gets?|is\s+)\s*(\d{3})\b/gi;
+    var m;
+    while ((m = re.exec(expl)) !== null) codes[m[1]] = 1;
+    var codeHits = [];
+    Object.keys(codes).forEach(function (code) {
+      for (var j = 0; j < q.options.length; j++) {
+        if (String(q.options[j] || "").indexOf(code) !== -1) codeHits.push(j);
+      }
+    });
+    var uniq = [];
+    codeHits.forEach(function (x) { if (uniq.indexOf(x) === -1) uniq.push(x); });
+    if (uniq.length === 1) q.answers = [String(q.options[uniq[0]])];
+  }
+
   function shuffleQuestionOptions(q) {
     if (!q || !Array.isArray(q.options) || q.options.length < 2) return q;
     var type = String(q.type || "").toLowerCase().replace(/\s+/g, "_");
     if (type !== "multiple_choice" && type !== "true_false") return q;
-    // CRITICAL: lock correct answer as full option text BEFORE shuffle
     lockAnswerAsOptionText(q);
+    reconcileAnswerWithExplanation(q);
     var opts = q.options.slice();
     for (var i = opts.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1));
@@ -127,8 +157,8 @@
       opts[j] = tmp;
     }
     q.options = opts;
-    // Re-lock text in case of whitespace differences
     lockAnswerAsOptionText(q);
+    reconcileAnswerWithExplanation(q);
     return q;
   }
 
@@ -138,6 +168,10 @@
   }
 
   function publishFinal(items) {
+    (items || []).forEach(function (q) {
+      lockAnswerAsOptionText(q);
+      reconcileAnswerWithExplanation(q);
+    });
     var list = (items || []).map(function (q) {
       return {
         type: q.type,
@@ -171,7 +205,6 @@
       var p = String(prompt || "");
       var isStudy = /exam questions|QUOTA|multiple_choice|flashcards|topic review|summary/i.test(p);
 
-      // Soft-clean SOURCE section in place (never empty the prompt)
       if (isStudy && /SOURCE:/i.test(p)) {
         var parts = p.split(/SOURCE:/i);
         if (parts.length >= 2) {
@@ -197,11 +230,11 @@
         String(systemText || "") +
         " Write HARD university-exam questions on the subject only. " +
         "Never mention documents, chapters, guides, files, or materials. " +
-        "Randomize correct-answer positions across A/B/C/D.";
+        "Randomize correct-answer positions across A/B/C/D. " +
+        "answers must be the exact full text of the correct option; explanation must name that same text.";
 
       var result = await original.call(this, p, schema, sys, preferredProvider, onStatus);
 
-      // Shuffle only - do NOT drop items (drops caused silent count mismatches)
       try {
         if (result && result.data) {
           if (Array.isArray(result.data.questions)) {
@@ -218,7 +251,7 @@
       return result;
     };
     window.__revdevRunBatch.__hardQualityWrapped = true;
-    console.info("RevDev: stabilized quality (prompt + shuffle only, soft clean, no drops)");
+    console.info("RevDev: quality + answer-key rules (prompt, shuffle, reconcile)");
     return true;
   }
 
@@ -229,7 +262,6 @@
     if (tries < 40) setTimeout(waitWrap, 250);
   })();
 
-  // On Done: publish final items from job.collected as-is (no second filter pass)
   var statusEl = document.getElementById("generation-status");
   if (statusEl) {
     var t = null;
@@ -247,13 +279,14 @@
           window.__revdevExamReady = true;
           return;
         }
-        // Lock every MC/TF answer as option text, then shuffle
         items.forEach(function (q) {
-          if (typeof lockAnswerAsOptionText === "function") lockAnswerAsOptionText(q);
+          lockAnswerAsOptionText(q);
+          reconcileAnswerWithExplanation(q);
         });
         shuffleAll(items);
         items.forEach(function (q) {
-          if (typeof lockAnswerAsOptionText === "function") lockAnswerAsOptionText(q);
+          lockAnswerAsOptionText(q);
+          reconcileAnswerWithExplanation(q);
         });
         window.__revdevFinalExamItems = items;
         window.__revdevPristineExamItems = items.slice();
