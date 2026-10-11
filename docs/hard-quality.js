@@ -56,10 +56,63 @@
     return String(s || "").trim().toLowerCase();
   }
 
+  /** Resolve answers to option TEXT before shuffle so letter keys stay valid. */
+  function lockAnswerAsOptionText(q) {
+    if (!q || !Array.isArray(q.options) || !q.options.length) return;
+    var answers = Array.isArray(q.answers) ? q.answers : (q.answers != null ? [q.answers] : []);
+    if (!answers.length) return;
+    var opts = q.options;
+    // Already matches an option text?
+    for (var a = 0; a < answers.length; a++) {
+      var ans = String(answers[a] || "").trim().toLowerCase();
+      if (!ans) continue;
+      for (var i = 0; i < opts.length; i++) {
+        if (String(opts[i] || "").trim().toLowerCase() === ans) {
+          q.answers = [String(opts[i])];
+          return;
+        }
+      }
+    }
+    // Letter form: A/B/C/D or Option A etc.
+    for (var a2 = 0; a2 < answers.length; a2++) {
+      var s = String(answers[a2] || "").trim();
+      var m = s.match(/^(?:option\s*|answer\s*:?\s*|\()?([a-d])\)?\.?$/i);
+      if (m) {
+        var idx = m[1].toUpperCase().charCodeAt(0) - 65;
+        if (idx >= 0 && idx < opts.length) {
+          q.answers = [String(opts[idx])];
+          return;
+        }
+      }
+      // numeric index
+      if (/^\d+$/.test(s)) {
+        var n = parseInt(s, 10);
+        if (n >= 0 && n < opts.length) { q.answers = [String(opts[n])]; return; }
+        if (n >= 1 && n <= opts.length) { q.answers = [String(opts[n - 1])]; return; }
+      }
+    }
+    // True/False
+    for (var a3 = 0; a3 < answers.length; a3++) {
+      var low = String(answers[a3] || "").trim().toLowerCase();
+      if (low === "true" || low === "t" || low === "yes") {
+        for (var t = 0; t < opts.length; t++) {
+          if (/^true$/i.test(String(opts[t]).trim())) { q.answers = [String(opts[t])]; return; }
+        }
+      }
+      if (low === "false" || low === "f" || low === "no") {
+        for (var f = 0; f < opts.length; f++) {
+          if (/^false$/i.test(String(opts[f]).trim())) { q.answers = [String(opts[f])]; return; }
+        }
+      }
+    }
+  }
+
   function shuffleQuestionOptions(q) {
     if (!q || !Array.isArray(q.options) || q.options.length < 2) return q;
     var type = String(q.type || "").toLowerCase().replace(/\s+/g, "_");
     if (type !== "multiple_choice" && type !== "true_false") return q;
+    // CRITICAL: lock correct answer as full option text BEFORE shuffle
+    lockAnswerAsOptionText(q);
     var opts = q.options.slice();
     for (var i = opts.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1));
@@ -68,6 +121,8 @@
       opts[j] = tmp;
     }
     q.options = opts;
+    // Re-lock text in case of whitespace differences
+    lockAnswerAsOptionText(q);
     return q;
   }
 
@@ -186,7 +241,14 @@
           window.__revdevExamReady = true;
           return;
         }
+        // Lock every MC/TF answer as option text, then shuffle
+        items.forEach(function (q) {
+          if (typeof lockAnswerAsOptionText === "function") lockAnswerAsOptionText(q);
+        });
         shuffleAll(items);
+        items.forEach(function (q) {
+          if (typeof lockAnswerAsOptionText === "function") lockAnswerAsOptionText(q);
+        });
         publishFinal(items);
         if (typeof window.__revdevRenderExamClean === "function" && (!job || job.mode === "exam" || !job.mode)) {
           try { window.__revdevRenderExamClean(items); } catch (e) {}
