@@ -327,50 +327,205 @@ body.has-exam-timer-bar #exam-output {
   }
 }
 
-/* ========== Per-question: Practice test card fills the screen ========== */
+
+/* ========== Per-question layout (taking mode) ========== */
+.exam-form.is-per-question {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+}
+
+.exam-form.is-per-question .exam-question {
+  display: none;
+}
+
+.exam-form.is-per-question .exam-question.is-active {
+  display: block;
+  width: 100%;
+  margin: 0;
+}
+
+/* Actions: Next stays visible and clear */
+.exam-form.is-per-question ~ .exam-actions,
+#exam-output:has(.exam-form.is-per-question) .exam-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+#exam-timer-next {
+  min-width: 120px;
+  font-weight: 600;
+}
+
+/* ========== Fullscreen: Practice test card fills the monitor ========== */
 #exam-output.exam-fullscreen-root:fullscreen,
 #exam-output.exam-fullscreen-root:-webkit-full-screen,
 #exam-output.exam-fullscreen-root:-ms-fullscreen {
   box-sizing: border-box;
   width: 100vw;
   height: 100vh;
-  max-width: none;
-  margin: 0;
-  border-radius: 0;
-  border: none;
-  padding: 20px 24px 32px;
-  overflow: auto;
-  background: var(--surface, #ffffff);
+  max-width: none !important;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0;
+  overflow: hidden;
+  background: var(--bg, #f1f5f9);
   color: var(--text, #0f172a);
-  display: block;
-}
-
-#exam-output.exam-fullscreen-root:fullscreen .exam-form,
-#exam-output.exam-fullscreen-root:-webkit-full-screen .exam-form {
-  max-width: 920px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-#exam-output.exam-fullscreen-root:fullscreen .exam-timer-bar,
-#exam-output.exam-fullscreen-root:-webkit-full-screen .exam-timer-bar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  width: 100%;
-  max-width: 920px;
-  margin: 0 auto 12px;
-}
-
-#exam-output.exam-fullscreen-root:fullscreen .exam-question.is-active,
-#exam-output.exam-fullscreen-root:-webkit-full-screen .exam-question.is-active {
-  max-width: 920px;
-  margin-left: auto;
-  margin-right: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 [data-theme="dark"] #exam-output.exam-fullscreen-root:fullscreen,
 [data-theme="dark"] #exam-output.exam-fullscreen-root:-webkit-full-screen {
-  background: var(--surface, #0f172a);
+  background: var(--bg, #0b1220);
   color: var(--text, #e2e8f0);
+}
+
+/* Header strip */
+#exam-output.exam-fullscreen-root:fullscreen > .section-header,
+#exam-output.exam-fullscreen-root:-webkit-full-screen > .section-header,
+#exam-output.exam-fullscreen-root:fullscreen > header,
+#exam-output.exam-fullscreen-root:fullscreen .section-heading,
+#exam-output.exam-fullscreen-root:-webkit-full-screen .section-heading {
+  flex: 0 0 auto;
+  padding: 16px 28px 8px;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+#exam-output.exam-fullscreen-root:fullscreen .section-kicker,
+#exam-output.exam-fullscreen-root:-webkit-full-screen .section-kicker {
+  letter-spacing: 0.06em;
+}
+
+/* Sticky timer under header */
+#exam-output.exam-fullscreen-root:fullscreen .exam-timer-bar,
+#exam-output.exam-fullscreen-root:-webkit-full-screen .exam-timer-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  flex: 0 0 auto;
+  width: min(960px, calc(100% - 48px));
+  margin: 0 auto 8px;
+  box-sizing: border-box;
+}
+
+/* Intro line — quieter */
+#exam-output.exam-fullscreen-root:fullscreen .exam-intro,
+#exam-output.exam-fullscreen-root:-webkit-full-screen .exam-intro {
+  flex: 0 0 auto;
+  width: min(960px, calc(100% - 48px));
+  margin: 0 auto 8px;
+  font-size: 0.875rem;
+  color: var(--muted, #64748b);
+  padding: 0 4px;
+  box-sizing: border-box;
+}
+
+/* Main scroll area: question fills the middle */
+#exam-output.exam-fullscreen-root:fullscreen .exam-form,
+#exam-output.exam-fullscreen-root:-webkit-full-screen .exam-form {
+  flex: 1 1 auto;
+  width: min(960px, calc(100% - 48px));
+  margin: 0 auto;
+  overflow: auto;
+  padding: 8px 4px 12px;
+  box-sizing: border-box;
+  min-height: 0;
+}
+
+#exam-output.exam-fullscreen-root:fullscreen .exam-form.is-per-question .exam-question.is-active,
+#exam-output.exam-fullscreen-root:-webkit-full-screen .exam-form.is-per-question .exam-question.is-active {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 16px;
+  padding: 22px 24px 20px;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
+}
+
+[data-theme="dark"] #exam-output.exam-fullscreen-root:fullscreen .exam-form.is-per-question .exam-question.is-active,
+[data-theme="dark"] #exam-output.exam-fullscreen-root:-webkit-full-screen .exam-form.is-per-question .exam-question.is-active {
+  background: var(--surface, #111827);
+  border-color: var(--border, #1f2937);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+
+#exam-output.exam-fullscreen-root:fullscreen .choice-option,
+#exam-output.exam-fullscreen-root:-webkit-full-screen .choice-option {
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+}
+
+/* Bottom action bar — fixed feel inside fullscreen */
+#exam-output.exam-fullscreen-root:fullscreen .exam-actions,
+#exam-output.exam-fullscreen-root:-webkit-full-screen .exam-actions {
+  flex: 0 0 auto;
+  width: min(960px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 14px 4px 20px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--border, #e2e8f0);
+  background: var(--bg, #f1f5f9);
+}
+
+[data-theme="dark"] #exam-output.exam-fullscreen-root:fullscreen .exam-actions,
+[data-theme="dark"] #exam-output.exam-fullscreen-root:-webkit-full-screen .exam-actions {
+  background: var(--bg, #0b1220);
+  border-top-color: var(--border, #1f2937);
+}
+
+#exam-output.exam-fullscreen-root:fullscreen #exam-timer-next,
+#exam-output.exam-fullscreen-root:-webkit-full-screen #exam-timer-next {
+  min-width: 140px;
+  padding: 12px 20px;
+  font-size: 1rem;
+  border-radius: 12px;
+}
+
+/* Hide print during focused taking */
+#exam-output.exam-fullscreen-root:fullscreen #print-exam,
+#exam-output.exam-fullscreen-root:-webkit-full-screen #print-exam {
+  display: none !important;
+}
+
+/* Non-fullscreen per-question: still tighten the card */
+#exam-output:has(.exam-form.is-per-question) {
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#exam-output:has(.exam-form.is-per-question) .exam-form.is-per-question .exam-question.is-active {
+  background: var(--surface, #f8fafc);
+  border-radius: 14px;
+  padding: 18px 18px 14px;
+  border: 1px solid var(--border, #e2e8f0);
+}
+
+@media (max-width: 640px) {
+  #exam-output.exam-fullscreen-root:fullscreen .exam-form,
+  #exam-output.exam-fullscreen-root:fullscreen .exam-timer-bar,
+  #exam-output.exam-fullscreen-root:fullscreen .exam-actions,
+  #exam-output.exam-fullscreen-root:fullscreen .exam-intro {
+    width: calc(100% - 24px);
+  }
+  #exam-output.exam-fullscreen-root:fullscreen .exam-form.is-per-question .exam-question.is-active {
+    padding: 16px 14px;
+  }
 }
