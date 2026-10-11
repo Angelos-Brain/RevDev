@@ -255,6 +255,8 @@
         items.forEach(function (q) {
           if (typeof lockAnswerAsOptionText === "function") lockAnswerAsOptionText(q);
         });
+        window.__revdevFinalExamItems = items;
+        window.__revdevPristineExamItems = items.slice();
         publishFinal(items);
         if (typeof window.__revdevRenderExamClean === "function" && (!job || job.mode === "exam" || !job.mode)) {
           try { window.__revdevRenderExamClean(items); } catch (e) {}
