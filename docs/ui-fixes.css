@@ -598,3 +598,21 @@ textarea {
   margin-top: 4px;
   accent-color: var(--primary, #4f46e5);
 }
+
+
+/* Footer creator credit */
+.site-footer .footer-credit {
+  margin: 8px 0 0;
+  font-size: 0.95rem;
+  color: var(--text-secondary, #4b5563);
+}
+.site-footer .footer-author {
+  display: inline-block;
+  color: var(--primary, #4f46e5);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+[data-theme="dark"] .site-footer .footer-author {
+  color: var(--primary, #818cf8);
+}
