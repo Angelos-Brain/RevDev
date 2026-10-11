@@ -812,16 +812,31 @@
   function refreshPanelVisibility() {
     if (ocrBusy) return;
     var files = getSelectedFiles();
-    var hasImage = files.some(isImageFile);
-    if (hasImage || looksLikeNeedsOcr()) {
+    if (!files.length) {
+      // Keep panel available but quiet when nothing selected
       showPanel(true);
-      if (hasImage) setHint("Image selected. Choose an engine and run OCR.");
+      setHint("Select a PDF or image, click Read files, then use Run OCR if you need text from images or scans.");
+      return;
+    }
+    var hasImage = files.some(isImageFile);
+    var hasPdf = files.some(isPdfFile);
+    showPanel(true);
+    if (hasImage) {
+      setHint("Image selected. Choose Local or Gemini, then Run OCR.");
+    } else if (hasPdf) {
+      setHint("PDF selected. Click Read files for normal text, then Run OCR to also capture text inside images.");
+    } else if (looksLikeNeedsOcr()) {
+      setHint("Little text found. Run OCR to extract words from a scan or image.");
+    } else {
+      setHint("Optional: Run OCR after Read files to add text from images in this file.");
     }
   }
 
   function bind() {
     extendFileInputAccept();
     ensureUi();
+    showPanel(true);
+    setHint("Select a file, click Read files, then Run OCR if you need text from images or scans.");
 
     var input = qs("file-input");
     if (input) {
