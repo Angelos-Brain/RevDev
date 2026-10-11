@@ -269,6 +269,71 @@
     return String(text || "").replace(/^\s*explanation\s*:\s*/i, "").trim();
   }
 
+  
+  function buildOutcomesFromTimerState() {
+    try {
+      if (!window.__revdevExamTimer || typeof window.__revdevExamTimer.getState !== "function") {
+        return null;
+      }
+      var st = window.__revdevExamTimer.getState();
+      if (!st || st.mode !== "per") return null;
+      var items = st.items;
+      if (!Array.isArray(items) || !items.length) items = getExamItems();
+      if (!Array.isArray(items) || !items.length) return null;
+      var results = st.results || {};
+      var outcomes = [];
+      for (var i = 0; i < items.length; i++) {
+        var r = results[i] || results[String(i)] || {};
+        var ans = r.answer != null ? String(r.answer) : "";
+        outcomes.push({
+          question: items[i] || {},
+          userAnswer: ans,
+          index: i,
+          timedOut: !!r.timedOut
+        });
+      }
+      return outcomes;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function syncTimerAnswersIntoForm(outcomes) {
+    var form = document.getElementById("exam-form");
+    if (!form || !outcomes || !outcomes.length) return;
+    // Enable all inputs so we can set checked
+    form.querySelectorAll("input, textarea, select").forEach(function (el) {
+      el.disabled = false;
+    });
+    outcomes.forEach(function (o) {
+      var i = o.index;
+      var ans = String(o.userAnswer || "").trim();
+      if (!ans) return;
+      var radios = form.querySelectorAll('input[name="question-' + i + '"]');
+      var matched = false;
+      radios.forEach(function (radio, ri) {
+        var val = String(radio.value || "");
+        var letter = String.fromCharCode(65 + ri);
+        if (
+          val === ans ||
+          val.toUpperCase() === ans.toUpperCase() ||
+          letter === ans.toUpperCase() ||
+          ans.toUpperCase() === letter + "." ||
+          (ans.length > 1 && val && (val === ans || ans.indexOf(val) >= 0 || val.indexOf(ans) >= 0))
+        ) {
+          radio.checked = true;
+          matched = true;
+        }
+      });
+      if (!matched) {
+        var text = form.querySelector(
+          'input[type="text"][name="question-' + i + '"], textarea[name="question-' + i + '"]'
+        );
+        if (text) text.value = ans;
+      }
+    });
+  }
+
   function getExamItems() {
     var lists = [];
     if (window.__revdevFinalExamItems && window.__revdevFinalExamItems.length) {
@@ -337,7 +402,16 @@
     var form = document.getElementById("exam-form");
     if (!form) return;
     if (!outcomes || !outcomes.length) {
-      outcomes = buildOutcomesFromForm();
+      // Per-question timer: prefer answers stored in timer state
+      var fromTimer = buildOutcomesFromTimerState();
+      if (fromTimer && fromTimer.length) {
+        outcomes = fromTimer;
+        syncTimerAnswersIntoForm(outcomes);
+      } else {
+        outcomes = buildOutcomesFromForm();
+      }
+    } else {
+      syncTimerAnswersIntoForm(outcomes);
     }
     if (!outcomes || !outcomes.length) {
       console.warn("[RevDev] markForm: no outcomes and no form questions");
@@ -423,6 +497,32 @@
         radios.forEach(function (input, i) {
           if (input.checked) userIdx = i;
         });
+        // Per-question: answer may be letter/text in outcome without radio checked
+        if (userIdx < 0 && answered) {
+          var ua = String(userAnswer).trim().toUpperCase();
+          radios.forEach(function (input, i) {
+            var letter = String.fromCharCode(65 + i);
+            var val = String(input.value || "").trim();
+            if (
+              ua === letter ||
+              ua === val.toUpperCase() ||
+              (val && ua.indexOf(val.toUpperCase()) === 0) ||
+              (val && val.toUpperCase().indexOf(ua) === 0)
+            ) {
+              userIdx = i;
+              input.checked = true;
+            }
+          });
+          if (userIdx < 0 && /^[A-D]$/.test(ua)) {
+            userIdx = ua.charCodeAt(0) - 65;
+            if (userIdx >= 0 && userIdx < radios.length) {
+              radios[userIdx].checked = true;
+            } else {
+              userIdx = -1;
+            }
+          }
+        }
+        answered = userIdx >= 0 || answered;
 
         var correct = hasKey && answered && userIdx === correctIdx;
         if (correct) scored++;
