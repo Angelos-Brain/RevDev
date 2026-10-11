@@ -552,3 +552,20 @@ textarea {
 .ocr-panel .progress {
   margin-top: 10px;
 }
+
+/* OCR Phase 2 controls */
+.ocr-controls {
+  margin: 0 0 12px;
+  max-width: 280px;
+}
+.ocr-lang-field .field-label {
+  display: block;
+  margin-bottom: 6px;
+}
+.ocr-lang-field select {
+  width: 100%;
+  min-height: 44px;
+}
+.ocr-panel .field-hint {
+  margin-top: 10px;
+}
