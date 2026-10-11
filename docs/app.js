@@ -1,4 +1,4 @@
-/* RevDev loader: known-good UI patches + hard quality + exam timer + review fix */
+/* RevDev loader: known-good UI patches + hard quality + exam timer + review fix + session persist */
 const res = await fetch(
   "https://raw.githubusercontent.com/Angelos-Brain/RevDev/ffb7eef/docs/app.js"
 );
@@ -10,3 +10,4 @@ await import(blobUrl);
 await import("./hard-quality.js?v=hq10");
 await import("./exam-timer.js?v=t7");
 await import("./review-fix.js?v=rf5");
+await import("./session-persist.js?v=sp1");
