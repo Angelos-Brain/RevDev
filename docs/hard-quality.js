@@ -1,5 +1,6 @@
 /* ============================================================
    HARD exam quality: prompt rules + blocklist + near-dup filter
+   + randomized correct-answer positions (no all-A pattern)
    ============================================================ */
 (function installHardQuestionQuality() {
   var BLOCKLIST = [
@@ -57,6 +58,9 @@
     "PER TYPE:",
     "- Multiple choice: 4 options, one best answer. Wrong options MUST be plausible domain concepts or common",
     "  misconceptions — similar length, no absurd/off-topic distractors, no all/none of the above.",
+    "- CRITICAL: Randomize the position of the correct answer. Across a batch, correct answers must be",
+    "  roughly evenly split among A, B, C, and D. NEVER put the correct answer as A for every question.",
+    "  Do not follow any fixed pattern (all A, alternating A/B, etc.).",
     "- True/False: precise statement wrong only on a meaningful detail.",
     "- Identification: describe by characteristics without naming it.",
     "- Short answer: 1–3 sentences of reasoning; include key points a correct answer must contain.",
@@ -147,6 +151,77 @@
     return false;
   }
 
+  function normalizeAnswerKey(s) {
+    return String(s || "").trim().toLowerCase();
+  }
+
+  /** Fisher–Yates shuffle of MC/TF options; answers stay as text so grading still works. */
+  function shuffleQuestionOptions(q) {
+    if (!q || !Array.isArray(q.options) || q.options.length < 2) return q;
+    var type = String(q.type || "").toLowerCase().replace(/\s+/g, "_");
+    if (type !== "multiple_choice" && type !== "true_false") return q;
+
+    var opts = q.options.slice();
+    for (var i = opts.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = opts[i];
+      opts[i] = opts[j];
+      opts[j] = tmp;
+    }
+    q.options = opts;
+    return q;
+  }
+
+  /**
+   * Re-shuffle items still stuck with correct answer at position 0
+   * so the exam is not heavily skewed toward A.
+   */
+  function balanceCorrectPositions(items) {
+    if (!Array.isArray(items) || !items.length) return items;
+    var mc = [];
+    items.forEach(function (q, idx) {
+      var type = String(q.type || "").toLowerCase().replace(/\s+/g, "_");
+      if ((type === "multiple_choice" || type === "true_false") && Array.isArray(q.options) && q.options.length >= 2) {
+        mc.push(idx);
+      }
+    });
+    if (mc.length < 2) return items;
+
+    mc.forEach(function (idx) {
+      shuffleQuestionOptions(items[idx]);
+    });
+
+    function correctIndex(q) {
+      var answers = (q.answers || []).map(normalizeAnswerKey).filter(Boolean);
+      if (!answers.length) return -1;
+      for (var i = 0; i < q.options.length; i++) {
+        if (answers.indexOf(normalizeAnswerKey(q.options[i])) !== -1) return i;
+      }
+      for (var a = 0; a < answers.length; a++) {
+        if (/^[a-d]$/.test(answers[a])) {
+          return answers[a].charCodeAt(0) - 97;
+        }
+      }
+      return -1;
+    }
+
+    var atZero = 0;
+    mc.forEach(function (idx) {
+      if (correctIndex(items[idx]) === 0) atZero++;
+    });
+    if (atZero / mc.length > 0.45) {
+      mc.forEach(function (idx) {
+        if (correctIndex(items[idx]) !== 0) return;
+        var tries = 0;
+        while (correctIndex(items[idx]) === 0 && tries < 8) {
+          shuffleQuestionOptions(items[idx]);
+          tries++;
+        }
+      });
+    }
+    return items;
+  }
+
   function filterItems(items) {
     var out = [];
     var rejected = 0;
@@ -161,6 +236,9 @@
       }
       out.push(q);
     });
+    // Randomize option order so correct answers are not always A
+    out.forEach(function (q) { shuffleQuestionOptions(q); });
+    balanceCorrectPositions(out);
     return { items: out, rejected: rejected };
   }
 
@@ -173,8 +251,7 @@
     if (!items || !items.length) return null;
 
     var result = filterItems(items);
-    if (result.rejected === 0 && result.items.length === items.length) return result;
-
+    // Always apply shuffled order back to job state and re-render so UI matches
     if (job) {
       job.collected = result.items;
       if (job.seen && typeof job.seen.clear === "function") {
@@ -201,7 +278,8 @@
       };
     });
 
-    if (typeof window.__revdevRenderExamClean === "function" && (job && job.mode === "exam" || last && last.mode === "exam")) {
+    var mode = (job && job.mode) || (last && last.mode) || "exam";
+    if (typeof window.__revdevRenderExamClean === "function" && mode === "exam") {
       try { window.__revdevRenderExamClean(result.items); } catch (e) {}
     }
     return result;
@@ -232,7 +310,8 @@
         String(systemText || "") +
         " Write HARD university-exam questions on the subject only. " +
         "Never mention documents, chapters, guides, files, or materials. " +
-        "No near-duplicate questions. Wrong options must be plausible domain misconceptions.";
+        "No near-duplicate questions. Wrong options must be plausible domain misconceptions. " +
+        "Randomize correct-answer positions across A/B/C/D — never all A.";
       var result = await original.call(this, p, schema, sys, preferredProvider, onStatus);
       try {
         if (result && result.data) {
@@ -250,7 +329,7 @@
       return result;
     };
     window.__revdevRunBatch.__hardQualityWrapped = true;
-    console.info("RevDev: hard question quality + near-dup filter armed");
+    console.info("RevDev: hard question quality + near-dup + answer-position shuffle armed");
     return true;
   }
 
