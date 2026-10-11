@@ -1,10 +1,35 @@
-/* Answer-key integrity: explanation overrides conflicting AI keys.
-   Runs after generation and again right before grading. */
+/* Answer-key integrity: repair ONLY when answers[0] matches NO option.
+   Never override a key that already equals exactly one option text. */
 (function () {
   "use strict";
 
   function norm(s) {
-    return String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+    return String(s || "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  /** True when answers[0] equals exactly one option. */
+  function keyMatchesExactlyOneOption(item) {
+    if (!item || !Array.isArray(item.options) || item.options.length < 2) return false;
+    var ans = Array.isArray(item.answers)
+      ? String(item.answers[0] != null ? item.answers[0] : "")
+      : String(item.answers || "");
+    if (!ans) return false;
+    var hits = 0;
+    var exact = null;
+    for (var i = 0; i < item.options.length; i++) {
+      if (norm(item.options[i]) === norm(ans)) {
+        hits++;
+        exact = String(item.options[i]);
+      }
+    }
+    if (hits === 1) {
+      item.answers = [exact];
+      return true;
+    }
+    return false;
   }
 
   /** Return option index uniquely supported by the explanation, or -1. */
@@ -14,7 +39,20 @@
     if (expl.trim().length < 8) return -1;
     var explLow = norm(expl);
 
-    // 1) Full option text (or leading probe) appears in explanation
+    // Prefer "Correct: <text>" prefix
+    var correctPrefix = /^correct:\s*([^\n.]+)/i.exec(expl);
+    if (correctPrefix) {
+      var phrase = norm(correctPrefix[1]);
+      var prefixHits = [];
+      for (var pi = 0; pi < item.options.length; pi++) {
+        var op0 = norm(item.options[pi]);
+        if (op0 === phrase || op0.indexOf(phrase) !== -1 || phrase.indexOf(op0) !== -1) {
+          prefixHits.push(pi);
+        }
+      }
+      if (prefixHits.length === 1) return prefixHits[0];
+    }
+
     var hits = [];
     for (var i = 0; i < item.options.length; i++) {
       var o = norm(item.options[i]);
@@ -24,16 +62,15 @@
     }
     if (hits.length === 1) return hits[0];
 
-    // 2) "correct answer is X" / "answer is X" patterns matching one option
     var phraseRe = /(?:correct(?:\s+answer)?|answer)\s*(?:is|:)\s*([^\n.]+)/gi;
     var pm;
     var phraseHits = [];
     while ((pm = phraseRe.exec(expl)) !== null) {
-      var phrase = norm(pm[1]).slice(0, 80);
-      if (phrase.length < 4) continue;
+      var phrase2 = norm(pm[1]).slice(0, 80);
+      if (phrase2.length < 4) continue;
       for (var p = 0; p < item.options.length; p++) {
         var op = norm(item.options[p]);
-        if (op === phrase || op.indexOf(phrase) !== -1 || phrase.indexOf(op) !== -1) {
+        if (op === phrase2 || op.indexOf(phrase2) !== -1 || phrase2.indexOf(op) !== -1) {
           phraseHits.push(p);
         }
       }
@@ -44,7 +81,6 @@
     });
     if (puniq.length === 1) return puniq[0];
 
-    // 3) Status / HTTP codes in explanation → option containing that code
     var codes = {};
     var re = /(?:status\s*code|returns?|receives?|encounters?|gets?|is\s+)\s*(\d{3})\b/gi;
     var m;
@@ -61,44 +97,6 @@
     });
     if (uniq.length === 1) return uniq[0];
 
-    // 4) Significant-word overlap with clear margin
-    function words(s) {
-      return norm(s)
-        .replace(/[^a-z0-9\s]/g, " ")
-        .split(/\s+/)
-        .filter(function (w) {
-          return (
-            w.length > 4 &&
-            !/^(which|where|their|there|these|those|about|would|could|should|being|after|before|under|over|while|during|system|systems|ability|between|correct|answer|option|because)$/.test(
-              w
-            )
-          );
-        });
-    }
-    function overlap(a, b) {
-      var wa = words(a);
-      var wb = words(b);
-      if (!wa.length || !wb.length) return 0;
-      var setB = Object.create(null);
-      wb.forEach(function (w) {
-        setB[w] = 1;
-      });
-      var hit = 0;
-      wa.forEach(function (w) {
-        if (setB[w]) hit++;
-      });
-      return hit / Math.max(wa.length, 1);
-    }
-    var scores = [];
-    for (var s = 0; s < item.options.length; s++) {
-      scores.push({ i: s, s: overlap(item.options[s], expl) });
-    }
-    scores.sort(function (a, b) {
-      return b.s - a.s;
-    });
-    if (scores.length && scores[0].s >= 0.28) {
-      if (scores.length === 1 || scores[0].s >= scores[1].s + 0.08) return scores[0].i;
-    }
     return -1;
   }
 
@@ -107,23 +105,17 @@
     var fixed = 0;
     list.forEach(function (q) {
       if (!q || !Array.isArray(q.options) || q.options.length < 2) return;
+
+      // ONLY act when answers[0] matches NO option
+      if (keyMatchesExactlyOneOption(q)) return;
+
       var idx = repairFromExplanation(q);
       if (idx < 0) return;
       var correct = String(q.options[idx]);
-      var current = Array.isArray(q.answers)
-        ? String(q.answers[0] != null ? q.answers[0] : "")
-        : String(q.answers || "");
-      if (norm(current) !== norm(correct)) {
-        q.answers = [correct];
-        fixed++;
-        if (typeof console !== "undefined" && console.info) {
-          console.info(
-            "[RevDev] answer-key-fix: corrected →",
-            correct.slice(0, 70)
-          );
-        }
-      } else {
-        q.answers = [correct];
+      q.answers = [correct];
+      fixed++;
+      if (typeof console !== "undefined" && console.info) {
+        console.info("[RevDev] answer-key-fix: filled missing key →", correct.slice(0, 70));
       }
     });
     return { fixed: fixed, total: list.length };
@@ -131,8 +123,11 @@
 
   function allItemLists() {
     var lists = [];
-    if (window.__revdevFinalExamItems && window.__revdevFinalExamItems.length)
+    // Prefer the shared committed array only
+    if (window.__revdevFinalExamItems && window.__revdevFinalExamItems.length) {
       lists.push(window.__revdevFinalExamItems);
+      return lists;
+    }
     if (window.__revdevPristineExamItems && window.__revdevPristineExamItems.length)
       lists.push(window.__revdevPristineExamItems);
     if (window.__revdevJob && window.__revdevJob.collected && window.__revdevJob.collected.length)
@@ -150,7 +145,6 @@
     return totalFixed;
   }
 
-  /** Console helper: audit keys vs explanations */
   window.__revdevAuditKeys = function () {
     var list =
       (window.__revdevFinalExamItems && window.__revdevFinalExamItems.length && window.__revdevFinalExamItems) ||
@@ -160,21 +154,10 @@
     var issues = 0;
     list.forEach(function (q, i) {
       var ans = Array.isArray(q.answers) ? q.answers[0] : q.answers;
-      var idx = repairFromExplanation(q);
-      var suggested = idx >= 0 ? q.options[idx] : null;
-      var match =
-        suggested == null ||
-        norm(ans) === norm(suggested) ||
-        norm(String(ans)).indexOf(norm(String(suggested)).slice(0, 20)) >= 0;
-      if (!match) {
+      var ok = keyMatchesExactlyOneOption(q);
+      if (!ok) {
         issues++;
-        console.warn(
-          "#" + (i + 1),
-          "KEY:",
-          String(ans).slice(0, 50),
-          "| EXPL suggests:",
-          String(suggested).slice(0, 50)
-        );
+        console.warn("#" + (i + 1), "KEY matches no option:", String(ans).slice(0, 50));
       } else {
         console.log("#" + (i + 1), "OK →", String(ans).slice(0, 60));
       }
@@ -185,27 +168,17 @@
   };
 
   function install() {
-    var tries = 0;
-    (function wait() {
-      fixAll();
-      tries++;
-      if (tries < 100) setTimeout(wait, 300);
-    })();
-
     var statusEl = document.getElementById("generation-status");
     if (statusEl) {
       new MutationObserver(function () {
         var t = statusEl.textContent || "";
-        if (!/Done\.|Generated \d+/i.test(t)) return;
+        if (!/\bDone\./i.test(t)) return;
         setTimeout(function () {
           var n = fixAll();
           if (n && typeof console !== "undefined") {
-            console.info("[RevDev] answer-key-fix: fixed", n, "key(s) after generation");
+            console.info("[RevDev] answer-key-fix: filled", n, "missing key(s)");
           }
-          try {
-            window.__revdevAuditKeys();
-          } catch (e) {}
-        }, 500);
+        }, 600);
       }).observe(statusEl, { childList: true, characterData: true, subtree: true });
     }
 
@@ -224,7 +197,7 @@
     );
 
     console.info(
-      "RevDev: answer-key-fix active — explanation overrides conflicting keys. Run __revdevAuditKeys() to inspect."
+      "RevDev: answer-key-fix active — only fills keys that match NO option. Run __revdevAuditKeys()."
     );
   }
 
