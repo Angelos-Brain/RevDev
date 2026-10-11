@@ -1,5 +1,5 @@
 /* ============================================================
-   RevDev OCR — Phases 1–4
+   RevDev OCR (Phases 1-4)
    Additive only. Lazy-loads Tesseract on local OCR.
    Phase 3: optional Gemini Vision OCR (user key + opt-in)
    Phase 4: deskew-ish prep, export .txt, handwriting note, SRI load
@@ -86,9 +86,9 @@
     panel.hidden = true;
     panel.innerHTML =
       '<div class="ocr-banner">' +
-      "<strong>OCR — convert scans and images to text</strong>" +
-      "<p>Runs in your browser by default. After Read files, OCR adds text from images alongside the text already extracted — it does not replace it.</p>" +
-      '<p class="ocr-handwriting-note">Handwriting and low-light photos are often weaker — prefer flat, typed scans when possible.</p>' +
+      "<strong>OCR: convert scans and images to text</strong>" +
+      "<p>Runs in your browser by default. After Read files, OCR adds text from images alongside the text already extracted. It does not replace it.</p>" +
+      '<p class="ocr-handwriting-note">Handwriting and low-light photos are often weaker. Prefer flat, typed scans when possible.</p>' +
       '<div class="ocr-controls">' +
       '<label class="field ocr-lang-field">' +
       '<span class="field-label">OCR language (local engine)</span>' +
@@ -103,11 +103,11 @@
       "<legend class=\"field-label\">OCR engine</legend>" +
       '<label class="ocr-engine-option">' +
       '<input type="radio" name="ocr-engine" value="local" checked>' +
-      "<span>Local (Tesseract) — free, private, on-device</span>" +
+      "<span>Local (Tesseract): free, private, on-device</span>" +
       "</label>" +
       '<label class="ocr-engine-option">' +
       '<input type="radio" name="ocr-engine" value="gemini" id="ocr-engine-gemini">' +
-      "<span>Gemini Vision — often clearer; uses your Gemini key &amp; quota</span>" +
+      "<span>Gemini Vision: often clearer; uses your Gemini key &amp; quota</span>" +
       "</label>" +
       "</fieldset>" +
       "</div>" +
@@ -302,8 +302,8 @@
     var genMeta = qs("generation-meta");
     if (genMeta) {
       genMeta.textContent = opts.mergeWithExisting
-        ? "Read files + OCR text ready — choose a study mode"
-        : "OCR text ready — choose a study mode";
+        ? "Read files + OCR text ready. Choose a study mode"
+        : "OCR text ready. Choose a study mode";
     }
     var exp = qs("ocr-export-button");
     if (exp) exp.hidden = false;
@@ -561,7 +561,7 @@
           text = await ocrCanvasGemini(canvas, apiKey);
         } catch (e) {
           // fallback to local
-          setHint(String(e.message || e) + " — using local OCR for this file.");
+          setHint(String(e.message || e) + " - using local OCR for this file.");
           if (!Tesseract) Tesseract = await loadTesseract();
           text = await ocrCanvasLocal(Tesseract, canvas, lang, function (p) {
             onProgress(1, 1, p, "Image");
@@ -597,7 +597,7 @@
           try {
             pageText = await ocrCanvasGemini(pg.canvas, apiKey);
           } catch (e) {
-            setHint(String(e.message || e) + " — local OCR for remaining pages.");
+            setHint(String(e.message || e) + " - local OCR for remaining pages.");
             engine = "local";
             if (!Tesseract) Tesseract = await loadTesseract();
             pageText = await ocrCanvasLocal(Tesseract, pg.canvas, lang, function (p) {
@@ -663,7 +663,7 @@
     });
     if (!targets.length) {
       setStatus("OCR works on images (PNG/JPG/WEBP) and scanned PDFs.", "error");
-      setHint("Text PDFs and DOCX already use normal extraction — no OCR needed.");
+      setHint("Text PDFs and DOCX already use normal extraction. No OCR needed.");
       showPanel(true);
       return;
     }
@@ -850,7 +850,7 @@
       ocrCache.clear();
     };
     window.__revdevExportOcr = exportOcrText;
-    console.info("RevDev OCR: phases 1–4 armed (local + Gemini Vision + export)");
+    console.info("RevDev OCR: phases 1-4 armed (local + Gemini Vision + export)");
   }
 
   if (document.readyState === "loading") {

@@ -1,4 +1,4 @@
-/* RevDev session persist — restore files + exam progress after refresh (IndexedDB) */
+/* RevDev session persist - restore files + exam progress after refresh (IndexedDB) */
 (function () {
   var DB_NAME = "revdev-session-v1";
   var DB_VER = 1;
@@ -328,7 +328,7 @@
         } catch (e) {}
       }
 
-      // Click Read if text not already restored — gives app a chance to re-parse
+      // Click Read if text not already restored - gives app a chance to re-parse
       if (!session.extractedText) {
         var readBtn = qs("read-button");
         if (readBtn) setTimeout(function () { readBtn.click(); }, 300);
@@ -528,7 +528,7 @@
     await new Promise(function (r) { setTimeout(r, 250); });
     var applied = applyAnswersToForm(answers);
     ensureSubmitGrading();
-    // Bind again after a beat — render helpers may rebind late
+    // Bind again after a beat - render helpers may rebind late
     setTimeout(ensureSubmitGrading, 500);
     setTimeout(ensureSubmitGrading, 1200);
 
@@ -640,7 +640,7 @@
     if (input) {
       input.addEventListener("change", function () {
         scheduleSaveFiles();
-        // After read completes, text appears in preview — watch that too
+        // After read completes, text appears in preview - watch that too
         setTimeout(scheduleSaveFiles, 1500);
         setTimeout(scheduleSaveFiles, 4000);
       });

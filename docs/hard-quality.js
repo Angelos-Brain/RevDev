@@ -201,7 +201,7 @@
 
       var result = await original.call(this, p, schema, sys, preferredProvider, onStatus);
 
-      // Shuffle only — do NOT drop items (drops caused silent count mismatches)
+      // Shuffle only - do NOT drop items (drops caused silent count mismatches)
       try {
         if (result && result.data) {
           if (Array.isArray(result.data.questions)) {
