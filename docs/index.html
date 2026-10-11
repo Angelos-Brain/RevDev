@@ -154,7 +154,7 @@
       <div class="card-heading">
         <div>
           <span class="section-kicker">2 · CONNECT FREE AI</span>
-          <h2>Gemini & Groq keys</h2>
+          <h2>Gemini &amp; Groq keys</h2>
         </div>
         <span class="mini-note">Auto-failover · No backend</span>
       </div>
@@ -398,11 +398,31 @@
 
   <footer class="site-footer">
     <div class="shell footer-inner">
-      <p>RevDev dual-key failover · Runs in your browser · No account required</p>
-      <p class="footer-credit">Created by <span class="footer-author">Mark Angelo P. Solsona</span></p>
+      <p>RevDev dual-key failover · Runs in your browser · No account, no backend, no paid service required. · v=t33</p>
+      <p class="footer-credit">Built by <strong class="footer-author">Mark Angelo P. Solsona</strong></p>
     </div>
   </footer>
 
-  <script src="app.js?v=t33"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.2/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.13.0/mammoth.browser.min.js"></script>
+  <script src="./session-backup.js?v=sb3"></script>
+  <script type="module" src="./ocr.js?v=ocr11"></script>
+  <script type="module" src="./app.js?v=t33"></script>
+
+  <script>
+  (function(){
+    var btn = document.getElementById("theme-toggle");
+    if (!btn) return;
+    btn.addEventListener("click", function(){
+      var cur = document.documentElement.getAttribute("data-theme");
+      var next;
+      if (cur === "dark") next = "light";
+      else if (cur === "light") next = "dark";
+      else next = window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem("revdev_theme", next); } catch(e) {}
+    });
+  })();
+  </script>
 </body>
 </html>
