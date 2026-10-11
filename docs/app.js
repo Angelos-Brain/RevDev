@@ -9,6 +9,6 @@ await import(blobUrl);
 
 await import("./hard-quality.js?v=hq11");
 await import("./exam-timer.js?v=t14");
-await import("./review-fix.js?v=rf7");
+await import("./review-fix.js?v=rf8");
 await import("./session-persist.js?v=sp8");
 await import("./ocr.js?v=ocr7");

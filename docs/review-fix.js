@@ -269,19 +269,53 @@
     return String(text || "").replace(/^\s*explanation\s*:\s*/i, "").trim();
   }
 
+  function getExamItems() {
+    var lists = [];
+    if (window.__revdevFinalExamItems && window.__revdevFinalExamItems.length) {
+      lists.push(window.__revdevFinalExamItems);
+    }
+    if (window.__revdevPristineExamItems && window.__revdevPristineExamItems.length) {
+      lists.push(window.__revdevPristineExamItems);
+    }
+    if (window.__revdevJob && window.__revdevJob.collected && window.__revdevJob.collected.length) {
+      lists.push(window.__revdevJob.collected);
+    }
+    if (window.__revdevLastResult && window.__revdevLastResult.items && window.__revdevLastResult.items.length) {
+      lists.push(window.__revdevLastResult.items);
+    }
+    try {
+      if (window.__revdevExamTimer && typeof window.__revdevExamTimer.getState === "function") {
+        var st = window.__revdevExamTimer.getState();
+        if (st && st.items && st.items.length) lists.push(st.items);
+      }
+    } catch (e) {}
+    // Prefer the list whose length matches the form question count
+    var form = document.getElementById("exam-form");
+    var n = form ? form.querySelectorAll(".exam-question").length : 0;
+    for (var i = 0; i < lists.length; i++) {
+      if (n && lists[i].length === n) return lists[i];
+    }
+    return lists[0] || [];
+  }
+
   function buildOutcomesFromForm() {
     var form = document.getElementById("exam-form");
     if (!form) return [];
-    var items =
-      (window.__revdevFinalExamItems && window.__revdevFinalExamItems.length && window.__revdevFinalExamItems) ||
-      (window.__revdevPristineExamItems && window.__revdevPristineExamItems.length && window.__revdevPristineExamItems) ||
-      (window.__revdevJob && window.__revdevJob.collected) ||
-      (window.__revdevLastResult && window.__revdevLastResult.items) ||
-      [];
+    var items = getExamItems();
     var fieldsets = form.querySelectorAll(".exam-question");
     var outcomes = [];
     fieldsets.forEach(function (fs, index) {
       var question = items[index] || {};
+      // Recover options from DOM if item is missing options
+      if (!Array.isArray(question.options) || !question.options.length) {
+        var domOpts = [];
+        fs.querySelectorAll('input[type="radio"]').forEach(function (r) {
+          domOpts.push(r.value);
+        });
+        if (domOpts.length) {
+          question = Object.assign({}, question, { options: domOpts });
+        }
+      }
       var name = "question-" + index;
       var userAnswer = "";
       var checked = form.querySelector('input[name="' + name + '"]:checked');
@@ -526,16 +560,47 @@
       }
     });
 
-    // Update score display to only count scorable questions
+    // Update score display
     var scoreEl = document.getElementById("exam-score");
     var percentEl = document.getElementById("exam-percent");
-    if (scoreEl && scorable > 0) {
-      scoreEl.textContent = scored + " / " + scorable;
+    if (scoreEl) {
+      scoreEl.textContent = scored + " / " + Math.max(scorable, outcomes.length);
     }
-    if (percentEl && scorable > 0) {
-      percentEl.textContent = Math.round((scored / scorable) * 100) + "%";
-    } else if (percentEl && scorable === 0) {
-      percentEl.textContent = "-";
+    if (percentEl) {
+      if (scorable > 0) {
+        percentEl.textContent = Math.round((scored / scorable) * 100) + "%";
+      } else if (outcomes.length) {
+        // Fallback grade: compare selected radio value to answers letter/text directly
+        var fbScored = 0;
+        var fbTotal = 0;
+        outcomes.forEach(function (o) {
+          var q = o.question || {};
+          var ans = Array.isArray(q.answers) ? q.answers : [q.answers];
+          var key = normalizeAnswerKey(q);
+          var ua = String(o.userAnswer || "").trim();
+          if (!ua) return;
+          fbTotal++;
+          if (key && (ua.toUpperCase() === key || ua.toUpperCase().indexOf(key) === 0)) {
+            fbScored++;
+          } else {
+            var opts = Array.isArray(q.options) ? q.options : [];
+            for (var ai = 0; ai < ans.length; ai++) {
+              if (ans[ai] != null && String(ans[ai]).trim() && String(ans[ai]).trim() === ua) {
+                fbScored++;
+                break;
+              }
+            }
+          }
+        });
+        if (fbTotal > 0) {
+          scoreEl.textContent = fbScored + " / " + fbTotal;
+          percentEl.textContent = Math.round((fbScored / fbTotal) * 100) + "%";
+        } else {
+          percentEl.textContent = "0%";
+        }
+      } else {
+        percentEl.textContent = "0%";
+      }
     }
 
     setTimeout(assertReviewValid, 0);
@@ -863,6 +928,40 @@
         setTimeout(syncFinalFromForm, 50);
       }
     }).observe(formEl, { childList: true });
+  }
+
+  
+  // Re-grade after per-question timer finishes (answers synced into form async)
+  document.addEventListener(
+    "click",
+    function (ev) {
+      var t = ev.target;
+      if (!t) return;
+      if (t.id === "submit-exam" || (t.closest && t.closest("#submit-exam"))) {
+        setTimeout(function () { try { markForm(); } catch (e) {} }, 150);
+        setTimeout(function () { try { markForm(); } catch (e) {} }, 500);
+      }
+    },
+    true
+  );
+
+  // Observe results panel becoming visible (timer finishExam path)
+  var resultsEl = document.getElementById("exam-results");
+  if (resultsEl && window.MutationObserver) {
+    new MutationObserver(function () {
+      if (resultsEl.hidden) return;
+      setTimeout(function () {
+        try {
+          var se = document.getElementById("exam-score");
+          if (se && /^0\s*\/\s*0$/.test(se.textContent || "")) {
+            markForm();
+          }
+        } catch (e) {}
+      }, 100);
+      setTimeout(function () {
+        try { markForm(); } catch (e) {}
+      }, 400);
+    }).observe(resultsEl, { attributes: true, attributeFilter: ["hidden"] });
   }
 
   console.info("RevDev: review-fix armed (strict single-green + counts + reclaim)");
