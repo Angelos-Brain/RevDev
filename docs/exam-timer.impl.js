@@ -2,7 +2,7 @@
 (async function () {
   var parts = [];
   for (var i = 0; i < 4; i++) {
-    var res = await fetch("./et_c" + i + ".txt?v=t7");
+    var res = await fetch("./et_c" + i + ".txt?v=t8");
     if (!res.ok) throw new Error("Missing et_c" + i + ".txt");
     parts.push((await res.text()).replace(/\s+/g, ""));
   }
