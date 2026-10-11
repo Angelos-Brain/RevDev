@@ -1,0 +1,91 @@
+/* Per-question mobile: fit option D on screen; sticky Next */
+@media (max-width: 640px) {
+  #exam-output:has(.exam-form.is-per-question) .exam-intro,
+  #exam-output .exam-intro {
+    margin-bottom: 8px;
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+
+  #exam-output:has(.exam-form.is-per-question) .exam-form.is-per-question .exam-question.is-active,
+  .exam-form.is-per-question .exam-question.is-active {
+    padding: 12px 12px 10px !important;
+  }
+
+  .exam-form.is-per-question .exam-question > legend {
+    margin-bottom: 8px;
+    gap: 6px;
+  }
+
+  .exam-form.is-per-question .exam-question .question-text {
+    margin-top: 6px;
+    font-size: 0.92rem;
+    line-height: 1.4;
+  }
+
+  .exam-form.is-per-question .exam-question .question-options {
+    margin-top: 8px;
+    gap: 6px;
+    padding-bottom: 8px;
+  }
+
+  .exam-form.is-per-question .exam-question .choice-option,
+  #exam-form .exam-question .choice-option {
+    padding: 8px 10px;
+    min-height: 40px;
+    column-gap: 8px;
+  }
+
+  .exam-form.is-per-question .exam-question .choice-marker,
+  .exam-question .choice-marker {
+    width: 24px;
+    height: 24px;
+    font-size: 0.65rem;
+  }
+
+  /* Sticky Next — always reachable; shows more content above */
+  #exam-output:has(.exam-form.is-per-question) .exam-actions,
+  .exam-form.is-per-question ~ .exam-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 30;
+    margin-top: 12px;
+    margin-bottom: 0;
+    padding: 10px 0 calc(10px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--border, #e2e8f0);
+    background: color-mix(in srgb, var(--bg, #f6f7fb) 92%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  [data-theme="dark"] #exam-output:has(.exam-form.is-per-question) .exam-actions,
+  [data-theme="dark"] .exam-form.is-per-question ~ .exam-actions {
+    background: color-mix(in srgb, var(--bg, #0b0f19) 92%, transparent);
+    border-top-color: var(--border, #1f2937);
+  }
+
+  #exam-timer-next {
+    min-width: 110px;
+    min-height: 44px;
+    flex: 1 1 auto;
+  }
+
+  body.has-exam-timer-bar #exam-output,
+  #exam-output:has(.exam-form.is-per-question) {
+    scroll-padding-bottom: 72px;
+  }
+}
+
+@media (max-width: 380px) {
+  .exam-form.is-per-question .exam-question .choice-option,
+  #exam-form .exam-question .choice-option {
+    padding: 7px 8px;
+    min-height: 38px;
+    grid-template-columns: 14px 22px minmax(0, 1fr) 22px;
+    column-gap: 6px;
+  }
+
+  .exam-form.is-per-question .exam-question .question-text {
+    font-size: 0.88rem;
+  }
+}
