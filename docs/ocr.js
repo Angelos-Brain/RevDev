@@ -87,7 +87,7 @@
     panel.innerHTML =
       '<div class="ocr-banner">' +
       "<strong>OCR — convert scans and images to text</strong>" +
-      "<p>Runs in your browser by default. Accuracy depends on image clarity; always skim the preview before Generate.</p>" +
+      "<p>Runs in your browser by default. After Read files, OCR adds text from images alongside the text already extracted — it does not replace it.</p>" +
       '<p class="ocr-handwriting-note">Handwriting and low-light photos are often weaker — prefer flat, typed scans when possible.</p>' +
       '<div class="ocr-controls">' +
       '<label class="field ocr-lang-field">' +
@@ -239,27 +239,72 @@
     return (preview.innerText || preview.textContent || "").trim();
   }
 
-  function injectText(text, metaLabel) {
+  function getExistingExtractedText() {
+    // Prefer in-memory source from a prior Read files; fall back to preview.
+    var fromMem =
+      (window.__revdevSourceText && String(window.__revdevSourceText).trim()) ||
+      (window.__revdevExtractedText && String(window.__revdevExtractedText).trim()) ||
+      "";
+    if (fromMem) return fromMem;
+    return getPreviewText();
+  }
+
+  function stripPriorOcrSection(text) {
+    // If user re-runs OCR, replace only the previous OCR block, keep Read files text.
+    var marker = "### OCR (from images / scans)";
+    var idx = text.indexOf(marker);
+    if (idx === -1) return text.trim();
+    return text.slice(0, idx).trim();
+  }
+
+  function mergeReadAndOcr(existingText, ocrText) {
+    existingText = stripPriorOcrSection(String(existingText || "").trim());
+    ocrText = String(ocrText || "").trim();
+    if (!ocrText) return existingText;
+    if (!existingText) {
+      return "### OCR (from images / scans)\n\n" + ocrText;
+    }
+    // Avoid duplicating if OCR text is already fully contained
+    if (existingText.indexOf(ocrText) !== -1) return existingText;
+    return (
+      existingText +
+      "\n\n\n### OCR (from images / scans)\n\n" +
+      ocrText
+    );
+  }
+
+  function injectText(text, metaLabel, opts) {
+    opts = opts || {};
     text = String(text || "").trim();
     if (!text) return false;
+
+    var finalText = text;
+    if (opts.mergeWithExisting) {
+      finalText = mergeReadAndOcr(getExistingExtractedText(), text);
+    }
+
     var preview = qs("preview");
     if (preview) {
-      preview.textContent = text;
+      preview.textContent = finalText;
       preview.classList.remove("empty-preview");
     }
     var meta = qs("preview-meta");
     if (meta) {
       meta.textContent =
-        (metaLabel || "OCR") + " · " + text.length.toLocaleString() + " characters";
+        (metaLabel || "OCR") + " · " + finalText.length.toLocaleString() + " characters";
     }
-    window.__revdevExtractedText = text;
-    window.__revdevSourceText = text;
+    window.__revdevExtractedText = finalText;
+    window.__revdevSourceText = finalText;
     window.__revdevLastOcrText = text;
-    if (window.__revdevJob) window.__revdevJob.sourceText = text;
+    if (window.__revdevJob) window.__revdevJob.sourceText = finalText;
     var gen = qs("generate-button");
     if (gen) gen.disabled = false;
     var genMeta = qs("generation-meta");
-    if (genMeta) genMeta.textContent = "OCR text ready — choose a study mode";
+    if (genMeta) {
+      genMeta.textContent = opts.mergeWithExisting
+        ? "Read files + OCR text ready — choose a study mode"
+        : "OCR text ready — choose a study mode";
+    }
     var exp = qs("ocr-export-button");
     if (exp) exp.hidden = false;
     return true;
@@ -715,11 +760,20 @@
         return;
       }
 
-      injectText(combined, targets.length + " OCR file(s) · " + engine);
-      var msg = "OCR complete (" + engine + "). Text is ready for Generate.";
+      var hadExisting = !!getExistingExtractedText();
+      injectText(combined, targets.length + " OCR file(s) · " + engine, {
+        mergeWithExisting: true
+      });
+      var msg = hadExisting
+        ? "OCR complete (" + engine + "). Image text was added alongside your Read files text."
+        : "OCR complete (" + engine + "). Text is ready for Generate.";
       if (usedCache) msg += " (" + usedCache + " from cache)";
       setStatus(msg, "success");
-      setHint("Skim the preview for mistakes before generating a mock exam.");
+      setHint(
+        hadExisting
+          ? "Preview now has both: text from Read files + OCR from images. Skim before Generate."
+          : "Skim the preview for mistakes before generating a mock exam."
+      );
       setProgress(100, "Done");
       showPanel(true);
     } catch (err) {
