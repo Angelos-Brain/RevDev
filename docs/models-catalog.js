@@ -61,7 +61,7 @@ export const MODELS_CATALOG = Object.freeze([
     downloadMB: 1440,
     vramMB: 1895,
     contextTokens: 4096,
-    description: "Google Gemma 2 — efficient and capable on modest GPUs.",
+    description: "Google Gemma 2: efficient and capable on modest GPUs.",
     rank: 5,
     lowResource: false,
     requiresShaderF16: true

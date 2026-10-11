@@ -1,4 +1,4 @@
-/* RevDev bootstrap v2 — known-good payload + packing repair */
+/* RevDev bootstrap v2 - known-good payload + packing repair */
 async function inflateBase64Gzip(b64) {
   const binary = atob(b64);
   const bytes = new Uint8Array(binary.length);

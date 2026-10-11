@@ -7,8 +7,8 @@ const code = await res.text();
 const blobUrl = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
 await import(blobUrl);
 
-await import("./hard-quality.js?v=hq10");
+await import("./hard-quality.js?v=hq11");
 await import("./exam-timer.js?v=t14");
-await import("./review-fix.js?v=rf6");
-await import("./session-persist.js?v=sp7");
+await import("./review-fix.js?v=rf7");
+await import("./session-persist.js?v=sp8");
 await import("./ocr.js?v=ocr5");
