@@ -780,6 +780,9 @@
         mergeWithExisting: true
       });
       try {
+        if (window.__revdevTextBackup && window.__revdevTextBackup.save) {
+          try { window.__revdevTextBackup.save(window.__revdevSourceText || combined); } catch (eB) {}
+        }
         if (window.__revdevSessionPersist && window.__revdevSessionPersist.saveExtractedText) {
           window.__revdevSessionPersist.saveExtractedText(
             window.__revdevSourceText || combined

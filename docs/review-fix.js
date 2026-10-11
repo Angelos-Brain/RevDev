@@ -277,16 +277,27 @@
       }
       var st = window.__revdevExamTimer.getState();
       if (!st || st.mode !== "per") return null;
-      var items = st.items;
-      if (!Array.isArray(items) || !items.length) items = getExamItems();
-      if (!Array.isArray(items) || !items.length) return null;
       var results = st.results || {};
+      // Timer getState returns items as a NUMBER (count), not the array — never use it as list
+      var items = getExamItems();
+      var form = document.getElementById("exam-form");
+      var n = 0;
+      if (items && items.length) n = items.length;
+      else if (form) n = form.querySelectorAll(".exam-question").length;
+      else if (typeof st.items === "number") n = st.items;
+      else n = Object.keys(results).length;
+      if (!n) return null;
       var outcomes = [];
-      for (var i = 0; i < items.length; i++) {
+      for (var i = 0; i < n; i++) {
         var r = results[i] || results[String(i)] || {};
         var ans = r.answer != null ? String(r.answer) : "";
+        // Also read from form if timer result empty
+        if (!ans && form) {
+          var checked = form.querySelector('input[name="question-' + i + '"]:checked');
+          if (checked) ans = checked.value;
+        }
         outcomes.push({
-          question: items[i] || {},
+          question: (items && items[i]) || {},
           userAnswer: ans,
           index: i,
           timedOut: !!r.timedOut
@@ -294,6 +305,7 @@
       }
       return outcomes;
     } catch (e) {
+      console.warn("[RevDev] buildOutcomesFromTimerState", e);
       return null;
     }
   }
@@ -735,13 +747,235 @@
     }
   }
 
-  window.__revdevMarkExamForm = markForm;
+  
+  function forceGradeFromDomAndTimer() {
+    var form = document.getElementById("exam-form");
+    if (!form) return;
+    var items = getExamItems();
+    var fieldsets = form.querySelectorAll(".exam-question");
+    if (!fieldsets.length) return;
+
+    var results = {};
+    try {
+      if (window.__revdevExamTimer && window.__revdevExamTimer.getState) {
+        var st = window.__revdevExamTimer.getState();
+        if (st && st.results) results = st.results;
+      }
+    } catch (e) {}
+
+    var scored = 0;
+    var total = fieldsets.length;
+
+    fieldsets.forEach(function (fs, index) {
+      var q = items[index] || {};
+      var radios = fs.querySelectorAll('input[type="radio"]');
+      var userIdx = -1;
+      var userAnswer = "";
+      radios.forEach(function (r, ri) {
+        if (r.checked) {
+          userIdx = ri;
+          userAnswer = r.value;
+        }
+      });
+      if (userIdx < 0) {
+        var tr = results[index] || results[String(index)];
+        if (tr && tr.answer != null && String(tr.answer).trim()) {
+          userAnswer = String(tr.answer).trim();
+          var ua = userAnswer.toUpperCase();
+          radios.forEach(function (r, ri) {
+            var letter = String.fromCharCode(65 + ri);
+            if (ua === letter || ua === String(r.value).toUpperCase()) {
+              userIdx = ri;
+              r.checked = true;
+            }
+          });
+          if (userIdx < 0 && /^[A-D]$/i.test(userAnswer)) {
+            userIdx = userAnswer.toUpperCase().charCodeAt(0) - 65;
+          }
+        }
+      }
+
+      var correctIdx = resolveCorrectOptionIndex(q);
+      // Fallback: letter answer against current option order
+      if (correctIdx < 0) {
+        var key = normalizeAnswerKey(q);
+        if (key && /^[A-D]$/.test(key)) correctIdx = key.charCodeAt(0) - 65;
+      }
+
+      fs.classList.remove("is-correct", "is-incorrect", "is-unanswered", "is-no-key");
+      fs.querySelectorAll(".choice-option").forEach(function (opt) {
+        opt.classList.remove("is-user-correct", "is-user-wrong", "is-correct-answer");
+        var m = opt.querySelector(".result-mark");
+        if (m) m.remove();
+      });
+
+      var hasKey = correctIdx >= 0 && correctIdx < radios.length;
+      var correct = hasKey && userIdx === correctIdx;
+      if (correct) scored++;
+
+      if (!hasKey) fs.classList.add("is-no-key");
+      else if (correct) fs.classList.add("is-correct");
+      else fs.classList.add("is-incorrect");
+
+      radios.forEach(function (input, i) {
+        var lab = input.closest(".choice-option");
+        if (!lab) return;
+        if (hasKey && i === correctIdx) {
+          lab.classList.add("is-correct-answer");
+          if (i === userIdx) lab.classList.add("is-user-correct");
+          var check = document.createElement("span");
+          check.className = "result-mark result-mark-check";
+          check.textContent = "\u2713";
+          lab.appendChild(check);
+        } else if (i === userIdx && hasKey) {
+          lab.classList.add("is-user-wrong");
+          var cross = document.createElement("span");
+          cross.className = "result-mark result-mark-cross";
+          cross.textContent = "\u2715";
+          lab.appendChild(cross);
+        }
+        input.disabled = true;
+      });
+    });
+
+    var scoreEl = document.getElementById("exam-score");
+    var percentEl = document.getElementById("exam-percent");
+    if (scoreEl) scoreEl.textContent = scored + " / " + total;
+    if (percentEl) percentEl.textContent = total ? Math.round((scored / total) * 100) + "%" : "0%";
+    window.__revdevExamSubmitted = true;
+    console.info("[RevDev] forceGrade scored", scored, "/", total);
+  }
+
+  window.__revdevForceGradePerQuestion = forceGradeFromDomAndTimer;
+
+  window.__revdevMarkExamForm = function(outcomes) {
+    markForm(outcomes);
+    // If still 0/0 after normal mark, force grade
+    setTimeout(function () {
+      var se = document.getElementById("exam-score");
+      if (se && /^0\s*\/\s*0$/.test((se.textContent || "").trim())) {
+        forceGradeFromDomAndTimer();
+      }
+    }, 50);
+  };
+  window.__revdevMarkExamFormRaw = markForm;
   window.__revdevAssertReviewValid = assertReviewValid;
 
   // Re-install if something else overwrites
   [0, 300, 1000, 2500].forEach(function (ms) {
     setTimeout(function () {
-      window.__revdevMarkExamForm = markForm;
+      
+  function forceGradeFromDomAndTimer() {
+    var form = document.getElementById("exam-form");
+    if (!form) return;
+    var items = getExamItems();
+    var fieldsets = form.querySelectorAll(".exam-question");
+    if (!fieldsets.length) return;
+
+    var results = {};
+    try {
+      if (window.__revdevExamTimer && window.__revdevExamTimer.getState) {
+        var st = window.__revdevExamTimer.getState();
+        if (st && st.results) results = st.results;
+      }
+    } catch (e) {}
+
+    var scored = 0;
+    var total = fieldsets.length;
+
+    fieldsets.forEach(function (fs, index) {
+      var q = items[index] || {};
+      var radios = fs.querySelectorAll('input[type="radio"]');
+      var userIdx = -1;
+      var userAnswer = "";
+      radios.forEach(function (r, ri) {
+        if (r.checked) {
+          userIdx = ri;
+          userAnswer = r.value;
+        }
+      });
+      if (userIdx < 0) {
+        var tr = results[index] || results[String(index)];
+        if (tr && tr.answer != null && String(tr.answer).trim()) {
+          userAnswer = String(tr.answer).trim();
+          var ua = userAnswer.toUpperCase();
+          radios.forEach(function (r, ri) {
+            var letter = String.fromCharCode(65 + ri);
+            if (ua === letter || ua === String(r.value).toUpperCase()) {
+              userIdx = ri;
+              r.checked = true;
+            }
+          });
+          if (userIdx < 0 && /^[A-D]$/i.test(userAnswer)) {
+            userIdx = userAnswer.toUpperCase().charCodeAt(0) - 65;
+          }
+        }
+      }
+
+      var correctIdx = resolveCorrectOptionIndex(q);
+      // Fallback: letter answer against current option order
+      if (correctIdx < 0) {
+        var key = normalizeAnswerKey(q);
+        if (key && /^[A-D]$/.test(key)) correctIdx = key.charCodeAt(0) - 65;
+      }
+
+      fs.classList.remove("is-correct", "is-incorrect", "is-unanswered", "is-no-key");
+      fs.querySelectorAll(".choice-option").forEach(function (opt) {
+        opt.classList.remove("is-user-correct", "is-user-wrong", "is-correct-answer");
+        var m = opt.querySelector(".result-mark");
+        if (m) m.remove();
+      });
+
+      var hasKey = correctIdx >= 0 && correctIdx < radios.length;
+      var correct = hasKey && userIdx === correctIdx;
+      if (correct) scored++;
+
+      if (!hasKey) fs.classList.add("is-no-key");
+      else if (correct) fs.classList.add("is-correct");
+      else fs.classList.add("is-incorrect");
+
+      radios.forEach(function (input, i) {
+        var lab = input.closest(".choice-option");
+        if (!lab) return;
+        if (hasKey && i === correctIdx) {
+          lab.classList.add("is-correct-answer");
+          if (i === userIdx) lab.classList.add("is-user-correct");
+          var check = document.createElement("span");
+          check.className = "result-mark result-mark-check";
+          check.textContent = "\u2713";
+          lab.appendChild(check);
+        } else if (i === userIdx && hasKey) {
+          lab.classList.add("is-user-wrong");
+          var cross = document.createElement("span");
+          cross.className = "result-mark result-mark-cross";
+          cross.textContent = "\u2715";
+          lab.appendChild(cross);
+        }
+        input.disabled = true;
+      });
+    });
+
+    var scoreEl = document.getElementById("exam-score");
+    var percentEl = document.getElementById("exam-percent");
+    if (scoreEl) scoreEl.textContent = scored + " / " + total;
+    if (percentEl) percentEl.textContent = total ? Math.round((scored / total) * 100) + "%" : "0%";
+    window.__revdevExamSubmitted = true;
+    console.info("[RevDev] forceGrade scored", scored, "/", total);
+  }
+
+  window.__revdevForceGradePerQuestion = forceGradeFromDomAndTimer;
+
+  window.__revdevMarkExamForm = function(outcomes) {
+    markForm(outcomes);
+    // If still 0/0 after normal mark, force grade
+    setTimeout(function () {
+      var se = document.getElementById("exam-score");
+      if (se && /^0\s*\/\s*0$/.test((se.textContent || "").trim())) {
+        forceGradeFromDomAndTimer();
+      }
+    }, 50);
+  };
+  window.__revdevMarkExamFormRaw = markForm;
     }, ms);
   });
 
@@ -997,7 +1231,118 @@
 
   // Continuously reclaim markForm so dual payload cannot overwrite it
   function reclaimMarkForm() {
-    window.__revdevMarkExamForm = markForm;
+    
+  function forceGradeFromDomAndTimer() {
+    var form = document.getElementById("exam-form");
+    if (!form) return;
+    var items = getExamItems();
+    var fieldsets = form.querySelectorAll(".exam-question");
+    if (!fieldsets.length) return;
+
+    var results = {};
+    try {
+      if (window.__revdevExamTimer && window.__revdevExamTimer.getState) {
+        var st = window.__revdevExamTimer.getState();
+        if (st && st.results) results = st.results;
+      }
+    } catch (e) {}
+
+    var scored = 0;
+    var total = fieldsets.length;
+
+    fieldsets.forEach(function (fs, index) {
+      var q = items[index] || {};
+      var radios = fs.querySelectorAll('input[type="radio"]');
+      var userIdx = -1;
+      var userAnswer = "";
+      radios.forEach(function (r, ri) {
+        if (r.checked) {
+          userIdx = ri;
+          userAnswer = r.value;
+        }
+      });
+      if (userIdx < 0) {
+        var tr = results[index] || results[String(index)];
+        if (tr && tr.answer != null && String(tr.answer).trim()) {
+          userAnswer = String(tr.answer).trim();
+          var ua = userAnswer.toUpperCase();
+          radios.forEach(function (r, ri) {
+            var letter = String.fromCharCode(65 + ri);
+            if (ua === letter || ua === String(r.value).toUpperCase()) {
+              userIdx = ri;
+              r.checked = true;
+            }
+          });
+          if (userIdx < 0 && /^[A-D]$/i.test(userAnswer)) {
+            userIdx = userAnswer.toUpperCase().charCodeAt(0) - 65;
+          }
+        }
+      }
+
+      var correctIdx = resolveCorrectOptionIndex(q);
+      // Fallback: letter answer against current option order
+      if (correctIdx < 0) {
+        var key = normalizeAnswerKey(q);
+        if (key && /^[A-D]$/.test(key)) correctIdx = key.charCodeAt(0) - 65;
+      }
+
+      fs.classList.remove("is-correct", "is-incorrect", "is-unanswered", "is-no-key");
+      fs.querySelectorAll(".choice-option").forEach(function (opt) {
+        opt.classList.remove("is-user-correct", "is-user-wrong", "is-correct-answer");
+        var m = opt.querySelector(".result-mark");
+        if (m) m.remove();
+      });
+
+      var hasKey = correctIdx >= 0 && correctIdx < radios.length;
+      var correct = hasKey && userIdx === correctIdx;
+      if (correct) scored++;
+
+      if (!hasKey) fs.classList.add("is-no-key");
+      else if (correct) fs.classList.add("is-correct");
+      else fs.classList.add("is-incorrect");
+
+      radios.forEach(function (input, i) {
+        var lab = input.closest(".choice-option");
+        if (!lab) return;
+        if (hasKey && i === correctIdx) {
+          lab.classList.add("is-correct-answer");
+          if (i === userIdx) lab.classList.add("is-user-correct");
+          var check = document.createElement("span");
+          check.className = "result-mark result-mark-check";
+          check.textContent = "\u2713";
+          lab.appendChild(check);
+        } else if (i === userIdx && hasKey) {
+          lab.classList.add("is-user-wrong");
+          var cross = document.createElement("span");
+          cross.className = "result-mark result-mark-cross";
+          cross.textContent = "\u2715";
+          lab.appendChild(cross);
+        }
+        input.disabled = true;
+      });
+    });
+
+    var scoreEl = document.getElementById("exam-score");
+    var percentEl = document.getElementById("exam-percent");
+    if (scoreEl) scoreEl.textContent = scored + " / " + total;
+    if (percentEl) percentEl.textContent = total ? Math.round((scored / total) * 100) + "%" : "0%";
+    window.__revdevExamSubmitted = true;
+    console.info("[RevDev] forceGrade scored", scored, "/", total);
+  }
+
+  window.__revdevForceGradePerQuestion = forceGradeFromDomAndTimer;
+
+  window.__revdevMarkExamForm = function(outcomes) {
+    markForm(outcomes);
+    // If still 0/0 after normal mark, force grade
+    setTimeout(function () {
+      var se = document.getElementById("exam-score");
+      if (se && /^0\s*\/\s*0$/.test((se.textContent || "").trim())) {
+        forceGradeFromDomAndTimer();
+      }
+    }, 50);
+  };
+  window.__revdevMarkExamFormRaw = markForm;
   }
   reclaimMarkForm();
   /* no setInterval - was freezing the page */
