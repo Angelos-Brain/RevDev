@@ -649,7 +649,7 @@ textarea {
 }
 
 
-/* RevDev logo mark + wordmark */
+/* RevDev logo mark + wordmark — force over imported styles */
 .brand-mark {
   display: inline-flex;
   align-items: center;
@@ -678,3 +678,58 @@ textarea {
 .brand-dev { color: var(--primary, #4F46E5); }
 [data-theme="dark"] .brand-rev { color: #ffffff; }
 [data-theme="dark"] .brand-dev { color: #A5B4FC; }
+
+
+/* RevDev logo mark + wordmark — force over imported styles */
+a.brand {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  text-decoration: none !important;
+}
+a.brand .brand-mark {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  overflow: visible !important;
+}
+a.brand .brand-logo {
+  display: block !important;
+  width: 40px !important;
+  height: 40px !important;
+  flex-shrink: 0 !important;
+}
+a.brand .brand-wordmark {
+  display: inline !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.03em !important;
+  font-size: 1.1rem !important;
+}
+a.brand .brand-rev {
+  color: #111827 !important;
+}
+a.brand .brand-dev {
+  color: #4F46E5 !important;
+}
+html[data-theme="dark"] a.brand .brand-rev {
+  color: #ffffff !important;
+}
+html[data-theme="dark"] a.brand .brand-dev {
+  color: #A5B4FC !important;
+}
+a.brand strong {
+  color: inherit !important;
+}
