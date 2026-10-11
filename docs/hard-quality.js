@@ -62,15 +62,21 @@
     var answers = Array.isArray(q.answers) ? q.answers : (q.answers != null ? [q.answers] : []);
     if (!answers.length) return;
     var opts = q.options;
-    // Already matches an option text?
+    // Exact or contains match against option text
     for (var a = 0; a < answers.length; a++) {
-      var ans = String(answers[a] || "").trim().toLowerCase();
+      var ans = String(answers[a] || "").trim().toLowerCase().replace(/\s+/g, " ");
       if (!ans) continue;
+      var hits = [];
       for (var i = 0; i < opts.length; i++) {
-        if (String(opts[i] || "").trim().toLowerCase() === ans) {
-          q.answers = [String(opts[i])];
-          return;
+        var o = String(opts[i] || "").trim().toLowerCase().replace(/\s+/g, " ");
+        if (!o) continue;
+        if (o === ans || (ans.length >= 8 && (o.indexOf(ans) !== -1 || ans.indexOf(o) !== -1))) {
+          hits.push(i);
         }
+      }
+      if (hits.length === 1) {
+        q.answers = [String(opts[hits[0]])];
+        return;
       }
     }
     // Letter form: A/B/C/D or Option A etc.
