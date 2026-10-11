@@ -543,7 +543,11 @@
           else break;
         }
       }
-      window.__revdevResumePerIndex = resumeAt;
+      // Only auto-resume if this page load restored the same exam (not a later regenerate)
+      if (!window.__revdevBlockPerResume) {
+        window.__revdevResumePerIndex = resumeAt;
+        window.__revdevResumePerLen = items.length;
+      }
       // Build timer results for already-answered questions so Next won't re-ask them
       var preResults = session.exam.timerResults || {};
       Object.keys(answers || {}).forEach(function (k) {
@@ -686,7 +690,14 @@
       new MutationObserver(function () {
         var text = status.textContent || "";
         if (/Done\.|Generated \d+/i.test(text)) {
-          setTimeout(saveExamProgress, 800);
+          // Brand-new generation: do not keep old resume index
+          window.__revdevResumePerIndex = null;
+          window.__revdevResumePerLen = null;
+          window.__revdevSessionRestored = true; // prevent late restore from old session
+          setTimeout(function () {
+            // Save the NEW exam only (answers empty)
+            saveExamProgress();
+          }, 800);
           setTimeout(saveExamProgress, 2000);
         }
       }).observe(status, { childList: true, characterData: true, subtree: true });
