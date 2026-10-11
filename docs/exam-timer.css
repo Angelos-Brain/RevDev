@@ -1,0 +1,328 @@
+/* Mock Exam timer UI — sits below sticky site header */
+:root {
+  --exam-timer-bar-h: 52px;
+}
+
+.timer-setting {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+}
+
+.timer-setting .field-label {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.timer-segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--surface-2, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+}
+
+.timer-segmented label {
+  cursor: pointer;
+  margin: 0;
+}
+
+.timer-segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.timer-segmented span {
+  display: inline-block;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--muted, #64748b);
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.timer-segmented input:checked + span {
+  background: var(--primary, #5b4fe8);
+  color: #fff;
+}
+
+.timer-segmented input:focus-visible + span {
+  outline: 2px solid var(--primary, #5b4fe8);
+  outline-offset: 2px;
+}
+
+.timer-summary {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted, #64748b);
+  font-variant-numeric: tabular-nums;
+}
+
+.exam-timer-start {
+  padding: 20px 16px;
+  border-radius: 14px;
+  background: var(--surface-2, rgba(0, 0, 0, 0.03));
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  margin-bottom: 16px;
+}
+
+.exam-timer-start h3 {
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+}
+
+.exam-timer-start ul {
+  margin: 0 0 16px;
+  padding-left: 1.2em;
+  color: var(--muted, #475569);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.exam-timer-start .start-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-bottom: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.exam-timer-start .start-meta strong {
+  display: block;
+  font-size: 1.25rem;
+  color: var(--text, inherit);
+}
+
+.exam-timer-start .start-meta span {
+  font-size: 0.8rem;
+  color: var(--muted, #64748b);
+}
+
+.exam-timer-bar {
+  position: sticky;
+  top: var(--header-h, 64px);
+  z-index: 35;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: var(--exam-timer-bar-h);
+  padding: 8px 12px;
+  margin: 0 0 12px;
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme="dark"] .exam-timer-bar {
+  background: var(--surface, #1e1e2e);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.exam-timer-bar .timer-clock {
+  font-size: 1.15rem;
+  font-weight: 700;
+  min-width: 5.5ch;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.exam-timer-bar.is-amber .timer-clock,
+.exam-timer-bar.is-amber .timer-cue {
+  color: #d97706;
+}
+
+.exam-timer-bar.is-red .timer-clock,
+.exam-timer-bar.is-red .timer-cue {
+  color: #dc2626;
+}
+
+.exam-timer-bar .timer-cue {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.exam-timer-bar .timer-meta {
+  font-size: 0.85rem;
+  color: var(--muted, #64748b);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.exam-timer-bar .timer-drain {
+  flex: 1 1 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  order: 10;
+}
+
+[data-theme="dark"] .exam-timer-bar .timer-drain {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.exam-timer-bar .timer-drain > i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--primary, #5b4fe8);
+  transform-origin: left center;
+  transform: scaleX(1);
+}
+
+.exam-timer-bar.is-amber .timer-drain > i {
+  background: #d97706;
+}
+
+.exam-timer-bar.is-red .timer-drain > i {
+  background: #dc2626;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .exam-timer-bar .timer-drain > i {
+    transition: none !important;
+  }
+}
+
+.exam-timer-bar .timer-nav-toggle {
+  flex: 0 0 auto;
+}
+
+.exam-pace-hint {
+  font-size: 0.8rem;
+  color: var(--muted, #64748b);
+  margin: 0 0 8px;
+}
+
+.exam-timer-nav {
+  margin: 0 0 12px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
+  background: var(--surface-2, rgba(0, 0, 0, 0.02));
+}
+
+.exam-timer-nav[hidden] {
+  display: none !important;
+}
+
+.exam-timer-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 6px;
+  max-height: 40vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.exam-timer-nav-grid button {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1.5px solid var(--border, #94a3b8);
+  background: transparent;
+  color: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.exam-timer-nav-grid button.is-answered {
+  background: var(--primary, #5b4fe8);
+  border-color: var(--primary, #5b4fe8);
+  color: #fff;
+}
+
+.exam-timer-nav-grid button.is-current {
+  border-width: 2.5px;
+  border-color: var(--text, #0f172a);
+  box-shadow: 0 0 0 1px var(--text, #0f172a);
+}
+
+[data-theme="dark"] .exam-timer-nav-grid button.is-current {
+  border-color: #e2e8f0;
+  box-shadow: 0 0 0 1px #e2e8f0;
+}
+
+.exam-timer-nav-grid button:focus-visible {
+  outline: 2px solid var(--primary, #5b4fe8);
+  outline-offset: 2px;
+}
+
+.exam-form.is-per-question .exam-question {
+  display: none;
+}
+
+.exam-form.is-per-question .exam-question.is-active {
+  display: block;
+}
+
+.exam-timer-times-up {
+  text-align: center;
+  font-weight: 700;
+  color: #dc2626;
+  padding: 12px;
+  font-size: 1.1rem;
+}
+
+.exam-time-chip {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.06);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme="dark"] .exam-time-chip {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.exam-time-chip.is-timeout {
+  color: #dc2626;
+}
+
+.exam-time-summary {
+  font-size: 0.9rem;
+  margin: 8px 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted, #475569);
+}
+
+.exam-timer-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+body.has-exam-timer-bar #exam-output {
+  scroll-padding-top: calc(var(--header-h, 64px) + var(--exam-timer-bar-h) + 12px);
+}
+
+@media print {
+  .exam-timer-bar,
+  .exam-timer-nav,
+  .exam-timer-start,
+  .timer-setting {
+    display: none !important;
+  }
+}
