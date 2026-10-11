@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="exam-options.css?v=ui8">
   <link rel="stylesheet" href="exam-feedback.css?v=ui8">
   <link rel="stylesheet" href="ui-fixes.css?v=8">
+  <link rel="stylesheet" href="exam-timer.css?v=t1">
 </head>
 <body>
   <header class="site-header">
@@ -133,7 +134,7 @@
       <div class="card-heading">
         <div>
           <span class="section-kicker">2 · CONNECT FREE AI</span>
-          <h2>Gemini & Groq keys</h2>
+          <h2>Gemini &amp; Groq keys</h2>
         </div>
         <span class="mini-note">Auto-failover · No backend</span>
       </div>
@@ -383,7 +384,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.2/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mammoth@1.13.0/mammoth.browser.min.js"></script>
-  <script type="module" src="./app.js?v=ui14"></script>
+  <script type="module" src="./app.js?v=timer1"></script>
 
   <script>
   (function(){
@@ -398,65 +399,6 @@
       document.documentElement.setAttribute("data-theme", next);
       try { localStorage.setItem("revdev_theme", next); } catch(e) {}
     });
-  })();
-  </script>
-
-  <script>
-  (function () {
-    function qs(id) { return document.getElementById(id); }
-    function updateStepper() {
-      var items = document.querySelectorAll(".stepper-item");
-      if (!items.length) return;
-      var statusText = (qs("status") && qs("status").textContent || "").toLowerCase();
-      var fileList = qs("file-list");
-      var fileHtml = fileList ? fileList.innerHTML.toLowerCase() : "";
-      var filesReadable =
-        /readable|finished|produced readable/.test(statusText) ||
-        /readable/.test(fileHtml) ||
-        (fileList && fileList.querySelector(".file-state.ready, .file-state"));
-      var keysStatus = qs("keys-status");
-      var keysText = (keysStatus && keysStatus.textContent || "").toLowerCase();
-      var g = qs("api-key-gemini");
-      var q = qs("api-key-groq");
-      var hasKeys =
-        ((g && g.value.trim().length > 8) || (q && q.value.trim().length > 8)) ||
-        (/saved|gemini|groq/.test(keysText) && !/no keys/.test(keysText));
-      var genStatus = qs("generation-status");
-      var genText = (genStatus && genStatus.textContent || "").toLowerCase();
-      var hasOutput =
-        /done|generated|success/.test(genText) ||
-        (qs("exam-output") && !qs("exam-output").hidden) ||
-        (qs("flashcards-output") && !qs("flashcards-output").hidden) ||
-        (qs("summary-output") && !qs("summary-output").hidden);
-      items.forEach(function (el) {
-        el.classList.remove("is-active", "is-done");
-        var step = el.getAttribute("data-step");
-        if (step === "1") {
-          if (filesReadable) el.classList.add("is-done");
-          else el.classList.add("is-active");
-        } else if (step === "2") {
-          if (filesReadable && hasKeys) el.classList.add("is-done");
-          else if (filesReadable) el.classList.add("is-active");
-        } else if (step === "3") {
-          if (hasOutput) el.classList.add("is-done");
-          else if (filesReadable && hasKeys) el.classList.add("is-active");
-        }
-      });
-    }
-    function bind() {
-      ["status", "file-list", "keys-status", "generation-status"].forEach(function (id) {
-        var el = qs(id);
-        if (!el) return;
-        var obs = new MutationObserver(updateStepper);
-        obs.observe(el, { childList: true, characterData: true, subtree: true, attributes: true });
-      });
-      document.addEventListener("input", updateStepper);
-      document.addEventListener("change", updateStepper);
-      updateStepper();
-      setInterval(updateStepper, 1500);
-    }
-    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bind);
-    else bind();
   })();
   </script>
 </body>
