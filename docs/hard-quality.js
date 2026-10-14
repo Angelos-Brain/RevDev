@@ -147,18 +147,11 @@
     if (!q || !Array.isArray(q.options) || q.options.length < 2) return q;
     var type = String(q.type || "").toLowerCase().replace(/\s+/g, "_");
     if (type !== "multiple_choice" && type !== "true_false") return q;
+    // Lock answer as FULL option text. Do NOT shuffle positions —
+    // shuffling broke letter keys and marked almost every question wrong.
     lockAnswerAsOptionText(q);
     reconcileAnswerWithExplanation(q);
-    var opts = q.options.slice();
-    for (var i = opts.length - 1; i > 0; i--) {
-      var j = Math.floor(Math.random() * (i + 1));
-      var tmp = opts[i];
-      opts[i] = opts[j];
-      opts[j] = tmp;
-    }
-    q.options = opts;
     lockAnswerAsOptionText(q);
-    reconcileAnswerWithExplanation(q);
     return q;
   }
 
