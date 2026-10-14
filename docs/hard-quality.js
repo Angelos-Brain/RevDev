@@ -155,6 +155,47 @@
     return q;
   }
 
+
+  /** Drop or flag items whose explanation is clearly about a different topic than the stem. */
+  function filterMismatchedExplanations(items) {
+    function nw(s) {
+      return String(s || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(function (w) {
+        return w.length > 5;
+      });
+    }
+    function overlap(a, b) {
+      var wa = nw(a), wb = nw(b);
+      if (!wa.length || !wb.length) return 0;
+      var set = Object.create(null);
+      wb.forEach(function (w) { set[w] = 1; });
+      var hit = 0;
+      wa.forEach(function (w) { if (set[w]) hit++; });
+      return hit / Math.max(wa.length, 1);
+    }
+    var kept = [];
+    (items || []).forEach(function (q) {
+      if (!q) return;
+      var stem = q.question || q.stem || "";
+      var expl = q.explanation || "";
+      if (stem.length > 20 && expl.length > 20) {
+        var s = overlap(stem, expl);
+        var shared = 0;
+        var ew = Object.create(null);
+        nw(expl).forEach(function (w) { ew[w] = 1; });
+        nw(stem).forEach(function (w) { if (ew[w]) shared++; });
+        if (s < 0.08 && shared < 1) {
+          // Explanation is about something else — clear it so grading won't trust it;
+          // keep the item if answers still point at an option.
+          console.warn("[RevDev] mismatched explanation cleared for:", String(stem).slice(0, 60));
+          q.explanation = "";
+          q.__revdevExplCleared = true;
+        }
+      }
+      kept.push(q);
+    });
+    return kept;
+  }
+
   function shuffleAll(items) {
     (items || []).forEach(shuffleQuestionOptions);
     return items || [];
@@ -224,7 +265,10 @@
         " Write HARD university-exam questions on the subject only. " +
         "Never mention documents, chapters, guides, files, or materials. " +
         "Randomize correct-answer positions across A/B/C/D. " +
-        "answers must be the exact full text of the correct option; explanation must name that same text.";
+        "answers must be the exact full text of the correct option; explanation must name that same text. " +
+        "CRITICAL: Each explanation must discuss ONLY that same question — never borrow text from another question. " +
+        "If the question is about co-location, the explanation must be about co-location; if about TPC-H, explain TPC-H. " +
+        "Mismatch between question topic and explanation is a hard failure.";
 
       var result = await original.call(this, p, schema, sys, preferredProvider, onStatus);
 
@@ -232,6 +276,7 @@
         if (result && result.data) {
           if (Array.isArray(result.data.questions)) {
             result.data.questions = shuffleAll(result.data.questions);
+            result.data.questions = filterMismatchedExplanations(result.data.questions);
           }
           if (Array.isArray(result.data.cards)) {
             result.data.cards = shuffleAll(result.data.cards);
