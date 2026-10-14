@@ -1,236 +1,243 @@
-/* Answer-key integrity: explanation overrides conflicting AI keys.
-   Runs after generation and again right before grading. */
+/* Answer-key integrity: every MC/TF key becomes exact option text before grading.
+   Explanation wins when it uniquely embeds an option. Letters only map before any
+   position change — we never trust a bare letter against shuffled options. */
 (function () {
   "use strict";
 
   function norm(s) {
-    return String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+    return String(s || "")
+      .toLowerCase()
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
-  /** Return option index uniquely supported by the explanation, or -1. */
-  function repairFromExplanation(item) {
-    if (!item || !Array.isArray(item.options) || item.options.length < 2) return -1;
-    var expl = String(item.explanation || "");
-    if (expl.trim().length < 8) return -1;
-    var explLow = norm(expl);
+  function significantWords(s) {
+    return norm(s)
+      .split(" ")
+      .filter(function (w) {
+        return (
+          w.length > 4 &&
+          !/^(which|where|their|there|these|those|about|would|could|should|being|after|before|under|over|while|during|system|systems|ability|between|correct|answer|option|because|other|distractors|describe|impossible|irrelevant|outcomes|matching|primary|benefit)$/.test(
+            w
+          )
+        );
+      });
+  }
 
-    // 1) Full option text (or leading probe) appears in explanation
-    var hits = [];
+  function scoreOverlap(a, b) {
+    var wa = significantWords(a);
+    var wb = significantWords(b);
+    if (!wa.length || !wb.length) return 0;
+    var setB = Object.create(null);
+    wb.forEach(function (w) {
+      setB[w] = 1;
+    });
+    var hit = 0;
+    wa.forEach(function (w) {
+      if (setB[w]) hit++;
+    });
+    return hit / Math.max(wa.length, 1);
+  }
+
+  function indexFromExplanation(item) {
+    if (!item || !Array.isArray(item.options) || item.options.length < 2) return -1;
+    var expl = norm(item.explanation || "");
+    if (expl.length < 12) return -1;
+
+    var best = [];
     for (var i = 0; i < item.options.length; i++) {
       var o = norm(item.options[i]);
-      if (o.length < 6) continue;
-      var probe = o.slice(0, Math.min(56, o.length));
-      if (probe.length >= 6 && explLow.indexOf(probe) !== -1) hits.push(i);
-    }
-    if (hits.length === 1) return hits[0];
-
-    // 2) "correct answer is X" / "answer is X" patterns matching one option
-    var phraseRe = /(?:correct(?:\s+answer)?|answer)\s*(?:is|:)\s*([^\n.]+)/gi;
-    var pm;
-    var phraseHits = [];
-    while ((pm = phraseRe.exec(expl)) !== null) {
-      var phrase = norm(pm[1]).slice(0, 80);
-      if (phrase.length < 4) continue;
-      for (var p = 0; p < item.options.length; p++) {
-        var op = norm(item.options[p]);
-        if (op === phrase || op.indexOf(phrase) !== -1 || phrase.indexOf(op) !== -1) {
-          phraseHits.push(p);
+      if (o.length < 12) continue;
+      var foundLen = 0;
+      for (var len = Math.min(o.length, 90); len >= 18; len -= 3) {
+        if (expl.indexOf(o.slice(0, len)) !== -1) {
+          foundLen = len;
+          break;
         }
       }
-    }
-    var puniq = [];
-    phraseHits.forEach(function (x) {
-      if (puniq.indexOf(x) === -1) puniq.push(x);
-    });
-    if (puniq.length === 1) return puniq[0];
-
-    // 3) Status / HTTP codes in explanation → option containing that code
-    var codes = {};
-    var re = /(?:status\s*code|returns?|receives?|encounters?|gets?|is\s+)\s*(\d{3})\b/gi;
-    var m;
-    while ((m = re.exec(expl)) !== null) codes[m[1]] = 1;
-    var codeHits = [];
-    Object.keys(codes).forEach(function (code) {
-      for (var j = 0; j < item.options.length; j++) {
-        if (String(item.options[j] || "").indexOf(code) !== -1) codeHits.push(j);
+      if (!foundLen && o.length >= 24) {
+        var mid = o.slice(6, Math.min(o.length, 70));
+        if (mid.length >= 16 && expl.indexOf(mid) !== -1) foundLen = mid.length;
       }
-    });
-    var uniq = [];
-    codeHits.forEach(function (x) {
-      if (uniq.indexOf(x) === -1) uniq.push(x);
-    });
-    if (uniq.length === 1) return uniq[0];
-
-    // 4) Significant-word overlap with clear margin
-    function words(s) {
-      return norm(s)
-        .replace(/[^a-z0-9\s]/g, " ")
-        .split(/\s+/)
-        .filter(function (w) {
-          return (
-            w.length > 4 &&
-            !/^(which|where|their|there|these|those|about|would|could|should|being|after|before|under|over|while|during|system|systems|ability|between|correct|answer|option|because)$/.test(
-              w
-            )
-          );
+      if (foundLen) best.push({ i: i, len: foundLen });
+    }
+    if (best.length) {
+      best.sort(function (a, b) {
+        return b.len - a.len;
+      });
+      if (best.length === 1 || best[0].len >= best[1].len + 6) return best[0].i;
+      // Tied probes: use overlap
+      var tied = best.filter(function (x) {
+        return x.len >= best[0].len - 3;
+      });
+      var ranked = tied
+        .map(function (t) {
+          return { i: t.i, s: scoreOverlap(item.options[t.i], expl) };
+        })
+        .sort(function (a, b) {
+          return b.s - a.s;
         });
+      if (ranked[0].s >= ranked[1].s + 0.08) return ranked[0].i;
+      if (ranked[0].s >= 0.35) return ranked[0].i;
     }
-    function overlap(a, b) {
-      var wa = words(a);
-      var wb = words(b);
-      if (!wa.length || !wb.length) return 0;
-      var setB = Object.create(null);
-      wb.forEach(function (w) {
-        setB[w] = 1;
-      });
-      var hit = 0;
-      wa.forEach(function (w) {
-        if (setB[w]) hit++;
-      });
-      return hit / Math.max(wa.length, 1);
-    }
+
     var scores = [];
     for (var s = 0; s < item.options.length; s++) {
-      scores.push({ i: s, s: overlap(item.options[s], expl) });
+      scores.push({ i: s, s: scoreOverlap(item.options[s], expl) });
     }
     scores.sort(function (a, b) {
       return b.s - a.s;
     });
-    if (scores.length && scores[0].s >= 0.28) {
-      if (scores.length === 1 || scores[0].s >= scores[1].s + 0.08) return scores[0].i;
+    if (scores[0] && scores[0].s >= 0.35) {
+      if (scores.length === 1 || scores[0].s >= scores[1].s + 0.12) return scores[0].i;
     }
     return -1;
   }
 
-  function fixItems(list) {
-    if (!Array.isArray(list)) return { fixed: 0, total: 0 };
-    var fixed = 0;
-    list.forEach(function (q) {
-      if (!q || !Array.isArray(q.options) || q.options.length < 2) return;
-      var idx = repairFromExplanation(q);
-      if (idx < 0) return;
-      var correct = String(q.options[idx]);
-      var current = Array.isArray(q.answers)
-        ? String(q.answers[0] != null ? q.answers[0] : "")
-        : String(q.answers || "");
-      if (norm(current) !== norm(correct)) {
-        q.answers = [correct];
-        fixed++;
-        if (typeof console !== "undefined" && console.info) {
-          console.info(
-            "[RevDev] answer-key-fix: corrected →",
-            correct.slice(0, 70)
-          );
+  function indexFromAnswers(item) {
+    if (!item || !Array.isArray(item.options)) return -1;
+    var raw = item.answers;
+    var candidates = [];
+    if (raw == null) return -1;
+    if (Array.isArray(raw)) {
+      raw.forEach(function (x) {
+        if (x == null) return;
+        if (Array.isArray(x)) x.forEach(function (y) { if (y != null) candidates.push(String(y)); });
+        else candidates.push(String(x));
+      });
+    } else candidates.push(String(raw));
+
+    for (var c = 0; c < candidates.length; c++) {
+      var ans = norm(candidates[c]);
+      if (!ans) continue;
+      // Exact / contains against option text
+      if (ans.length >= 8 && !/^[a-d]$/.test(ans)) {
+        var hits = [];
+        for (var i = 0; i < item.options.length; i++) {
+          var o = norm(item.options[i]);
+          if (!o) continue;
+          if (o === ans || o.indexOf(ans) !== -1 || ans.indexOf(o) !== -1) hits.push(i);
         }
-      } else {
-        q.answers = [correct];
+        if (hits.length === 1) return hits[0];
       }
-    });
-    return { fixed: fixed, total: list.length };
+    }
+    // Letter only if options were NOT shuffled (stable order) — still convert to text
+    for (var c2 = 0; c2 < candidates.length; c2++) {
+      var m = String(candidates[c2] || "").trim().match(/^(?:option\s*)?([a-d])\)?\.?$/i);
+      if (m) {
+        var idx = m[1].toUpperCase().charCodeAt(0) - 65;
+        if (idx >= 0 && idx < item.options.length) return idx;
+      }
+    }
+    return -1;
   }
 
-  function allItemLists() {
-    var lists = [];
-    if (window.__revdevFinalExamItems && window.__revdevFinalExamItems.length)
-      lists.push(window.__revdevFinalExamItems);
-    if (window.__revdevPristineExamItems && window.__revdevPristineExamItems.length)
-      lists.push(window.__revdevPristineExamItems);
-    if (window.__revdevJob && window.__revdevJob.collected && window.__revdevJob.collected.length)
-      lists.push(window.__revdevJob.collected);
-    if (window.__revdevLastResult && window.__revdevLastResult.items && window.__revdevLastResult.items.length)
-      lists.push(window.__revdevLastResult.items);
-    return lists;
+  function fixItem(q) {
+    if (!q || !Array.isArray(q.options) || !q.options.length) return false;
+    var type = String(q.type || "").toLowerCase().replace(/\s+/g, "_");
+    var isChoice =
+      type === "multiple_choice" ||
+      type === "true_false" ||
+      (Array.isArray(q.options) && q.options.length >= 2);
+    if (!isChoice) return false;
+
+    // Prefer explanation when it clearly names one option
+    var fromExpl = indexFromExplanation(q);
+    var fromAns = indexFromAnswers(q);
+    var idx = -1;
+    if (fromExpl >= 0) idx = fromExpl;
+    else if (fromAns >= 0) idx = fromAns;
+    if (idx < 0) return false;
+
+    var text = String(q.options[idx]);
+    var prev = Array.isArray(q.answers) ? String(q.answers[0] || "") : String(q.answers || "");
+    q.answers = [text];
+    q.__revdevKeyIndex = idx;
+    return norm(prev) !== norm(text);
+  }
+
+  function allLists() {
+    var out = [];
+    if (Array.isArray(window.__revdevFinalExamItems)) out.push(window.__revdevFinalExamItems);
+    if (Array.isArray(window.__revdevPristineExamItems)) out.push(window.__revdevPristineExamItems);
+    if (window.__revdevJob && Array.isArray(window.__revdevJob.collected)) out.push(window.__revdevJob.collected);
+    if (window.__revdevLastResult && Array.isArray(window.__revdevLastResult.items))
+      out.push(window.__revdevLastResult.items);
+    return out;
   }
 
   function fixAll() {
-    var totalFixed = 0;
-    allItemLists().forEach(function (list) {
-      totalFixed += fixItems(list).fixed;
+    var changed = 0;
+    allLists().forEach(function (list) {
+      list.forEach(function (q) {
+        if (fixItem(q)) changed++;
+      });
     });
-    return totalFixed;
+    return changed;
   }
 
-  /** Console helper: audit keys vs explanations */
-  window.__revdevAuditKeys = function () {
-    var list =
-      (window.__revdevFinalExamItems && window.__revdevFinalExamItems.length && window.__revdevFinalExamItems) ||
-      (window.__revdevPristineExamItems && window.__revdevPristineExamItems.length && window.__revdevPristineExamItems) ||
-      [];
-    console.group("[RevDev] Answer key audit (" + list.length + " items)");
-    var issues = 0;
-    list.forEach(function (q, i) {
-      var ans = Array.isArray(q.answers) ? q.answers[0] : q.answers;
-      var idx = repairFromExplanation(q);
-      var suggested = idx >= 0 ? q.options[idx] : null;
-      var match =
-        suggested == null ||
-        norm(ans) === norm(suggested) ||
-        norm(String(ans)).indexOf(norm(String(suggested)).slice(0, 20)) >= 0;
-      if (!match) {
-        issues++;
-        console.warn(
-          "#" + (i + 1),
-          "KEY:",
-          String(ans).slice(0, 50),
-          "| EXPL suggests:",
-          String(suggested).slice(0, 50)
-        );
-      } else {
-        console.log("#" + (i + 1), "OK →", String(ans).slice(0, 60));
+  function wrapMark() {
+    var cur = window.__revdevMarkExamForm;
+    if (!cur || cur.__akWrap) return;
+    function wrapped(outcomes) {
+      fixAll();
+      if (Array.isArray(outcomes)) {
+        outcomes.forEach(function (o) {
+          if (o && o.question) fixItem(o.question);
+        });
       }
-    });
-    console.log("Issues:", issues, "/", list.length);
-    console.groupEnd();
-    return { total: list.length, issues: issues };
+      return cur.apply(this, arguments);
+    }
+    wrapped.__akWrap = true;
+    // Keep raw reference for other modules
+    if (!window.__revdevMarkExamFormRaw) window.__revdevMarkExamFormRaw = cur;
+    window.__revdevMarkExamForm = wrapped;
+  }
+
+  // After generation finishes, lock keys
+  var status = document.getElementById("generation-status");
+  if (status) {
+    new MutationObserver(function () {
+      var t = status.textContent || "";
+      if (/Done\.|Generated \d+/i.test(t)) {
+        setTimeout(fixAll, 300);
+        setTimeout(fixAll, 1000);
+        setTimeout(fixAll, 2500);
+      }
+    }).observe(status, { childList: true, characterData: true, subtree: true });
+  }
+
+  document.addEventListener(
+    "click",
+    function (e) {
+      var t = e.target;
+      if (!t) return;
+      var btn = t.id ? t : t.closest && t.closest("button");
+      if (!btn) return;
+      if (btn.id === "submit-exam" || btn.id === "exam-timer-next" || btn.id === "retake-exam") {
+        fixAll();
+        wrapMark();
+      }
+    },
+    true
+  );
+
+  wrapMark();
+  [100, 500, 1500, 4000].forEach(function (ms) {
+    setTimeout(function () {
+      wrapMark();
+      fixAll();
+    }, ms);
+  });
+
+  window.__revdevFixAnswerKeys = fixAll;
+  window.__revdevResolveKeyIndex = function (q) {
+    var i = indexFromExplanation(q);
+    if (i >= 0) return i;
+    return indexFromAnswers(q);
   };
 
-  function install() {
-    var tries = 0;
-    (function wait() {
-      fixAll();
-      tries++;
-      if (tries < 100) setTimeout(wait, 300);
-    })();
-
-    var statusEl = document.getElementById("generation-status");
-    if (statusEl) {
-      new MutationObserver(function () {
-        var t = statusEl.textContent || "";
-        if (!/Done\.|Generated \d+/i.test(t)) return;
-        setTimeout(function () {
-          var n = fixAll();
-          if (n && typeof console !== "undefined") {
-            console.info("[RevDev] answer-key-fix: fixed", n, "key(s) after generation");
-          }
-          try {
-            window.__revdevAuditKeys();
-          } catch (e) {}
-        }, 500);
-      }).observe(statusEl, { childList: true, characterData: true, subtree: true });
-    }
-
-    document.addEventListener(
-      "click",
-      function (e) {
-        var t = e.target;
-        if (!t) return;
-        var btn = t.id ? t : t.closest && t.closest("button");
-        var id = btn && btn.id;
-        if (id === "submit-exam" || id === "exam-timer-next" || id === "retake-exam") {
-          fixAll();
-        }
-      },
-      true
-    );
-
-    console.info(
-      "RevDev: answer-key-fix active — explanation overrides conflicting keys. Run __revdevAuditKeys() to inspect."
-    );
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", install);
-  } else {
-    install();
-  }
+  console.info("RevDev: answer-key-fix active (text keys, explanation override, no letter trap)");
 })();
