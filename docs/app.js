@@ -9,7 +9,7 @@ await import(blobUrl);
 
 await import("./hard-quality.js?v=hq15");
 await import("./exam-timer.js?v=t15");
-await import("./review-fix.js?v=rf17");
+await import("./review-fix.js?v=rf7");
 await import("./answer-key-fix.js?v=ak3");
 await import("./force-full-grade.js?v=fg2");
 await import("./session-persist.js?v=sp13");
